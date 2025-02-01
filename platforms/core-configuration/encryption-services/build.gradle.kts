@@ -24,18 +24,14 @@ dependencies {
     api(projects.baseServices)
     api(projects.hashing)
     api(projects.serviceProvider)
+    api(projects.stdlibJavaExtensions)
 
     api(libs.kotlinStdlib)
 
     implementation(projects.buildOption)
-    implementation(projects.core)
     implementation(projects.coreApi)
     implementation(projects.coreKotlinExtensions)
     implementation(projects.loggingApi)
     implementation(projects.persistentCache)
-    implementation(projects.stdlibJavaExtensions)
     implementation(projects.stdlibKotlinExtensions)
-}
-tasks.isolatedProjectsIntegTest {
-    enabled = false
 }

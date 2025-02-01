@@ -16,8 +16,8 @@
 
 package org.gradle.api.problems.internal;
 
-import com.google.common.collect.Multimap;
 import org.gradle.api.problems.Problems;
+import org.gradle.internal.reflect.Instantiator;
 
 public interface InternalProblems extends Problems {
 
@@ -28,5 +28,9 @@ public interface InternalProblems extends Problems {
      */
     InternalProblemReporter getInternalReporter();
 
-    Multimap<Throwable, Problem> getProblemsForThrowables();
+    AdditionalDataBuilderFactory getAdditionalDataBuilderFactory();
+
+    Instantiator getInstantiator();
+
+    InternalProblemBuilder getProblemBuilder();
 }

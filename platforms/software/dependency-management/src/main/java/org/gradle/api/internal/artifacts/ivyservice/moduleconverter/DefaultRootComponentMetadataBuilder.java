@@ -20,15 +20,22 @@ import org.gradle.api.artifacts.component.ComponentIdentifier;
 import org.gradle.api.internal.DomainObjectContext;
 import org.gradle.api.internal.artifacts.ImmutableModuleIdentifierFactory;
 import org.gradle.api.internal.artifacts.Module;
+import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
 import org.gradle.api.internal.artifacts.configurations.ConfigurationsProvider;
 import org.gradle.api.internal.artifacts.configurations.DependencyMetaDataProvider;
 import org.gradle.api.internal.artifacts.configurations.MutationValidator;
+import org.gradle.api.internal.artifacts.ivyservice.moduleconverter.dependencies.DefaultLocalVariantGraphResolveStateBuilder;
+import org.gradle.api.internal.artifacts.ivyservice.moduleconverter.dependencies.LocalVariantGraphResolveStateBuilder;
 import org.gradle.api.internal.attributes.AttributesSchemaInternal;
+import org.gradle.api.internal.attributes.immutable.ImmutableAttributesSchema;
+import org.gradle.api.internal.attributes.immutable.ImmutableAttributesSchemaFactory;
 import org.gradle.api.internal.project.HoldsProjectState;
+import org.gradle.internal.component.local.model.LocalComponentGraphResolveMetadata;
 import org.gradle.internal.component.local.model.LocalComponentGraphResolveState;
 import org.gradle.internal.component.local.model.LocalComponentGraphResolveStateFactory;
 import org.gradle.internal.component.local.model.LocalVariantGraphResolveState;
-import org.gradle.internal.component.model.VariantGraphResolveState;
+import org.gradle.internal.lazy.Lazy;
+import org.gradle.internal.model.CalculatedValueContainerFactory;
 import org.gradle.internal.model.ModelContainer;
 
 import javax.annotation.Nullable;
@@ -44,6 +51,9 @@ public class DefaultRootComponentMetadataBuilder implements RootComponentMetadat
     // Services
     private final ImmutableModuleIdentifierFactory moduleIdentifierFactory;
     private final LocalComponentGraphResolveStateFactory localResolveStateFactory;
+    private final ImmutableAttributesSchemaFactory attributesSchemaFactory;
+    private final LocalVariantGraphResolveStateBuilder variantStateBuilder;
+    private final CalculatedValueContainerFactory calculatedValueContainerFactory;
     private final DefaultRootComponentMetadataBuilder.Factory factory;
 
     // State
@@ -59,6 +69,9 @@ public class DefaultRootComponentMetadataBuilder implements RootComponentMetadat
         AttributesSchemaInternal schema,
         ImmutableModuleIdentifierFactory moduleIdentifierFactory,
         LocalComponentGraphResolveStateFactory localResolveStateFactory,
+        ImmutableAttributesSchemaFactory attributesSchemaFactory,
+        LocalVariantGraphResolveStateBuilder variantStateBuilder,
+        CalculatedValueContainerFactory calculatedValueContainerFactory,
         Factory factory
     ) {
         this.owner = owner;
@@ -68,6 +81,9 @@ public class DefaultRootComponentMetadataBuilder implements RootComponentMetadat
 
         this.moduleIdentifierFactory = moduleIdentifierFactory;
         this.localResolveStateFactory = localResolveStateFactory;
+        this.attributesSchemaFactory = attributesSchemaFactory;
+        this.variantStateBuilder = variantStateBuilder;
+        this.calculatedValueContainerFactory = calculatedValueContainerFactory;
         this.factory = factory;
 
         this.holder = new MetadataHolder();
@@ -79,35 +95,47 @@ public class DefaultRootComponentMetadataBuilder implements RootComponentMetadat
         String status = module.getStatus();
         ComponentIdentifier componentIdentifier = module.getComponentId();
         ModuleVersionIdentifier moduleVersionId = moduleIdentifierFactory.moduleWithVersion(module.getGroup(), module.getName(), module.getVersion());
+        ImmutableAttributesSchema immutableSchema = attributesSchemaFactory.create(schema);
+
+        LocalComponentGraphResolveMetadata metadata = new LocalComponentGraphResolveMetadata(
+            moduleVersionId,
+            componentIdentifier,
+            status,
+            immutableSchema
+        );
+
+        LocalComponentGraphResolveState rootComponent = getComponentState(owner, metadata);
+
+        // `Lazy` can be removed when we remove `hasRootVariant` below.
+        Lazy<LocalVariantGraphResolveState> rootVariant = Lazy.unsafe().of(() -> {
+            ConfigurationInternal resolvedConf = configurationsProvider.findByName(configurationName);
+            if (resolvedConf == null) {
+                throw new IllegalStateException(String.format("Expected root variant '%s' to be present in %s", configurationName, rootComponent.getId()));
+            }
+            return variantStateBuilder.createRootVariantState(
+                resolvedConf,
+                configurationsProvider,
+                componentIdentifier,
+                new DefaultLocalVariantGraphResolveStateBuilder.DependencyCache(),
+                owner.getModel(),
+                calculatedValueContainerFactory
+            );
+        });
 
         return new RootComponentState() {
             @Override
             public LocalComponentGraphResolveState getRootComponent() {
-                return getComponentState(owner, componentIdentifier, moduleVersionId, status, schema);
+                return rootComponent;
             }
 
             @Override
-            public VariantGraphResolveState getRootVariant() {
-                // TODO: We should not ask the component for a resolvable configuration. Components should only
-                // expose variants -- which are by definition consumable only. Instead, we should create our own
-                // root variant and add it to a new one-off root component that holds only that root variant.
-                // The root variant should not live in a standard local component alongside other (consumable) variants.
-                @SuppressWarnings("deprecation")
-                LocalVariantGraphResolveState rootVariant = getRootComponent().getConfigurationLegacy(configurationName);
-                if (rootVariant == null) {
-                    throw new IllegalArgumentException(String.format("Expected root variant '%s' to be present in %s", configurationName, componentIdentifier));
-                }
-                return rootVariant;
+            public LocalVariantGraphResolveState getRootVariant() {
+                return rootVariant.get();
             }
 
             @Override
-            public ComponentIdentifier getComponentIdentifier() {
-                return componentIdentifier;
-            }
-
-            @Override
-            public ModuleVersionIdentifier getModuleVersionIdentifier() {
-                return moduleVersionId;
+            public boolean hasRootVariant() {
+                return configurationsProvider.findByName(configurationName) != null;
             }
         };
     }
@@ -119,12 +147,9 @@ public class DefaultRootComponentMetadataBuilder implements RootComponentMetadat
 
     private LocalComponentGraphResolveState getComponentState(
         DomainObjectContext domainObjectContext,
-        ComponentIdentifier componentIdentifier,
-        ModuleVersionIdentifier moduleVersionIdentifier,
-        String status,
-        AttributesSchemaInternal schema
+        LocalComponentGraphResolveMetadata metadata
     ) {
-        LocalComponentGraphResolveState state = holder.tryCached(componentIdentifier);
+        LocalComponentGraphResolveState state = holder.tryCached(metadata.getId());
         if (state != null) {
             return state;
         }
@@ -133,11 +158,11 @@ public class DefaultRootComponentMetadataBuilder implements RootComponentMetadat
         ModelContainer<?> model = domainObjectContext.getModel();
 
         if (shouldCacheResolutionState()) {
-            result = localResolveStateFactory.stateFor(model, componentIdentifier, moduleVersionIdentifier, configurationsProvider, status, schema);
+            result = localResolveStateFactory.stateFor(model, metadata, configurationsProvider);
             holder.cache(result, true);
         } else {
             // Mark the state as 'ad hoc' and not cacheable
-            result = localResolveStateFactory.adHocStateFor(model, componentIdentifier, moduleVersionIdentifier, configurationsProvider, status, schema);
+            result = localResolveStateFactory.adHocStateFor(model, metadata, configurationsProvider);
             holder.cache(result, false);
         }
 
@@ -226,14 +251,23 @@ public class DefaultRootComponentMetadataBuilder implements RootComponentMetadat
     public static class Factory {
         private final ImmutableModuleIdentifierFactory moduleIdentifierFactory;
         private final LocalComponentGraphResolveStateFactory localResolveStateFactory;
+        private final ImmutableAttributesSchemaFactory attributesSchemaFactory;
+        private final LocalVariantGraphResolveStateBuilder variantStateBuilder;
+        private final CalculatedValueContainerFactory calculatedValueContainerFactory;
 
         @Inject
         public Factory(
             ImmutableModuleIdentifierFactory moduleIdentifierFactory,
-            LocalComponentGraphResolveStateFactory localResolveStateFactory
+            LocalComponentGraphResolveStateFactory localResolveStateFactory,
+            ImmutableAttributesSchemaFactory attributesSchemaFactory,
+            LocalVariantGraphResolveStateBuilder variantStateBuilder,
+            CalculatedValueContainerFactory calculatedValueContainerFactory
         ) {
             this.moduleIdentifierFactory = moduleIdentifierFactory;
             this.localResolveStateFactory = localResolveStateFactory;
+            this.attributesSchemaFactory = attributesSchemaFactory;
+            this.variantStateBuilder = variantStateBuilder;
+            this.calculatedValueContainerFactory = calculatedValueContainerFactory;
         }
 
         public RootComponentMetadataBuilder create(
@@ -249,6 +283,9 @@ public class DefaultRootComponentMetadataBuilder implements RootComponentMetadat
                 schema,
                 moduleIdentifierFactory,
                 localResolveStateFactory,
+                attributesSchemaFactory,
+                variantStateBuilder,
+                calculatedValueContainerFactory,
                 this
             );
         }

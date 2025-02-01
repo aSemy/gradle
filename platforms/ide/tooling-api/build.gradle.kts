@@ -33,6 +33,7 @@ dependencies {
     shadedImplementation(libs.slf4jApi)
 
     runtimeOnly(projects.coreApi)
+
     implementation(projects.core)
     implementation(projects.buildProcessServices)
     implementation(projects.serviceProvider)
@@ -40,16 +41,17 @@ dependencies {
 
     implementation(libs.guava)
 
-    api(libs.jsr305)
     api(projects.baseServices)
     api(projects.buildOperations)
     api(projects.concurrent)
     api(projects.enterpriseLogging)
-    api(projects.stdlibJavaExtensions)
     api(projects.logging)
     api(projects.messaging)
+    api(projects.stdlibJavaExtensions)
     api(projects.time)
     api(projects.wrapperShared)
+
+    api(libs.jsr305)
 
     testFixturesImplementation(projects.coreApi)
     testFixturesImplementation(projects.core)
@@ -66,6 +68,7 @@ dependencies {
     integTestImplementation(projects.persistentCache)
 
     crossVersionTestImplementation(projects.jvmServices)
+    crossVersionTestImplementation(projects.problems)
     crossVersionTestImplementation(testFixtures(projects.problemsApi))
     crossVersionTestImplementation(libs.jettyWebApp)
     crossVersionTestImplementation(libs.commonsIo)
@@ -73,10 +76,13 @@ dependencies {
         because("BuildFinishedCrossVersionSpec classpath inference requires cglib enhancer")
     }
 
+    testImplementation(projects.buildEvents)
+
     testImplementation(testFixtures(projects.core))
     testImplementation(testFixtures(projects.logging))
     testImplementation(testFixtures(projects.dependencyManagement))
     testImplementation(testFixtures(projects.ide))
+    testImplementation(testFixtures(projects.time))
     testImplementation(testFixtures(projects.workers))
 
     integTestNormalizedDistribution(projects.distributionsFull) {

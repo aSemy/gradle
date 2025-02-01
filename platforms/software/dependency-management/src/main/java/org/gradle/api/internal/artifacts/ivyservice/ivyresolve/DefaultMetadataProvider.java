@@ -29,17 +29,17 @@ import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.AttributeContainer;
 import org.gradle.api.internal.artifacts.DefaultModuleVersionIdentifier;
 import org.gradle.api.internal.artifacts.MetadataResolutionContext;
-import org.gradle.api.internal.artifacts.configurations.dynamicversion.CachePolicy;
 import org.gradle.api.internal.artifacts.ivyservice.DefaultIvyModuleDescriptor;
+import org.gradle.api.internal.artifacts.ivyservice.CacheExpirationControl;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.MavenVersionUtils;
 import org.gradle.api.internal.artifacts.repositories.resolver.ComponentMetadataAdapter;
 import org.gradle.api.internal.attributes.AttributeContainerInternal;
+import org.gradle.api.internal.attributes.AttributesFactory;
 import org.gradle.api.internal.attributes.ImmutableAttributes;
-import org.gradle.api.internal.attributes.ImmutableAttributesFactory;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.internal.action.InstantiatingAction;
 import org.gradle.internal.component.external.model.ExternalComponentResolveMetadata;
-import org.gradle.internal.component.external.model.ModuleComponentGraphResolveState;
+import org.gradle.internal.component.external.model.ExternalModuleComponentGraphResolveState;
 import org.gradle.internal.component.external.model.ivy.IvyModuleResolveMetadata;
 import org.gradle.internal.logging.text.TreeFormatter;
 import org.gradle.internal.reflect.Instantiator;
@@ -52,7 +52,7 @@ import java.util.List;
 class DefaultMetadataProvider implements MetadataProvider {
     private final static Transformer<ComponentMetadata, BuildableComponentMetadataSupplierDetails> TO_COMPONENT_METADATA = BuildableComponentMetadataSupplierDetails::getExecutionResult;
     private final ModuleComponentResolveState resolveState;
-    private BuildableModuleComponentMetaDataResolveResult<ModuleComponentGraphResolveState> cachedResult;
+    private BuildableModuleComponentMetaDataResolveResult<ExternalModuleComponentGraphResolveState> cachedResult;
     private ComponentMetadata cachedComponentMetadata;
     private boolean computedMetadata;
 
@@ -89,7 +89,7 @@ class DefaultMetadataProvider implements MetadataProvider {
     }
 
     private ComponentMetadata transformThroughComponentMetadataRules(InstantiatingAction<ComponentMetadataSupplierDetails> componentMetadataSupplier, ComponentMetadata metadata) {
-        DefaultMetadataResolutionContext resolutionContext = new DefaultMetadataResolutionContext(resolveState.getCachePolicy(), componentMetadataSupplier.getInstantiator());
+        DefaultMetadataResolutionContext resolutionContext = new DefaultMetadataResolutionContext(resolveState.getCacheExpirationControl(), componentMetadataSupplier.getInstantiator());
         metadata = resolveState.getComponentMetadataProcessorFactory().createComponentMetadataProcessor(resolutionContext).processMetadata(metadata);
         return metadata;
     }
@@ -100,7 +100,7 @@ class DefaultMetadataProvider implements MetadataProvider {
         metadata = resolveState.getComponentMetadataSupplierExecutor().execute(id, componentMetadataSupplier, TO_COMPONENT_METADATA, id1 -> {
             final SimpleComponentMetadataBuilder builder = new SimpleComponentMetadataBuilder(id1, resolveState.getAttributesFactory());
             return new BuildableComponentMetadataSupplierDetails(builder);
-        }, resolveState.getCachePolicy());
+        }, resolveState.getCacheExpirationControl());
         return metadata;
     }
 
@@ -145,7 +145,7 @@ class DefaultMetadataProvider implements MetadataProvider {
         private List<String> statusScheme = ExternalComponentResolveMetadata.DEFAULT_STATUS_SCHEME;
         private final AttributeContainerInternal attributes;
 
-        private SimpleComponentMetadataBuilder(ModuleVersionIdentifier id, ImmutableAttributesFactory attributesFactory) {
+        private SimpleComponentMetadataBuilder(ModuleVersionIdentifier id, AttributesFactory attributesFactory) {
             this.id = id;
             this.attributes = attributesFactory.mutable();
             this.attributes.attribute(ProjectInternal.STATUS_ATTRIBUTE, MavenVersionUtils.inferStatusFromEffectiveVersion(id.getVersion()));
@@ -242,17 +242,17 @@ class DefaultMetadataProvider implements MetadataProvider {
 
     private static class DefaultMetadataResolutionContext implements MetadataResolutionContext {
 
-        private final CachePolicy cachePolicy;
+        private final CacheExpirationControl cacheExpirationControl;
         private final Instantiator instantiator;
 
-        private DefaultMetadataResolutionContext(CachePolicy cachePolicy, Instantiator instantiator) {
-            this.cachePolicy = cachePolicy;
+        private DefaultMetadataResolutionContext(CacheExpirationControl cacheExpirationControl, Instantiator instantiator) {
+            this.cacheExpirationControl = cacheExpirationControl;
             this.instantiator = instantiator;
         }
 
         @Override
-        public CachePolicy getCachePolicy() {
-            return cachePolicy;
+        public CacheExpirationControl getCacheExpirationControl() {
+            return cacheExpirationControl;
         }
 
         @Override

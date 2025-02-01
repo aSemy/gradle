@@ -31,7 +31,9 @@ import org.gradle.api.internal.collections.DefaultDomainObjectCollectionFactory;
 import org.gradle.api.internal.collections.DomainObjectCollectionFactory;
 import org.gradle.api.internal.file.FileCollectionFactory;
 import org.gradle.api.internal.file.FilePropertyFactory;
+import org.gradle.api.internal.file.FileResolver;
 import org.gradle.api.internal.file.collections.DirectoryFileTreeFactory;
+import org.gradle.api.internal.file.temp.TemporaryFileProvider;
 import org.gradle.api.internal.model.DefaultObjectFactory;
 import org.gradle.api.internal.model.NamedObjectInstantiator;
 import org.gradle.api.internal.provider.PropertyFactory;
@@ -42,13 +44,18 @@ import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.tasks.util.PatternSet;
 import org.gradle.api.tasks.util.internal.CachingPatternSpecFactory;
 import org.gradle.api.tasks.util.internal.PatternSpecFactory;
+import org.gradle.cache.CacheCleanupStrategyFactory;
 import org.gradle.cache.internal.CleaningInMemoryCacheDecoratorFactory;
 import org.gradle.cache.internal.CrossBuildInMemoryCacheFactory;
+import org.gradle.cache.internal.DefaultCacheCleanupStrategyFactory;
 import org.gradle.cache.internal.InMemoryCacheDecoratorFactory;
 import org.gradle.configuration.DefaultImportsReader;
 import org.gradle.configuration.ImportsReader;
 import org.gradle.execution.DefaultWorkValidationWarningRecorder;
 import org.gradle.execution.WorkValidationWarningReporter;
+import org.gradle.groovy.scripts.internal.DefaultScriptSourceHasher;
+import org.gradle.groovy.scripts.internal.ScriptSourceHasher;
+import org.gradle.initialization.BuildCancellationToken;
 import org.gradle.initialization.ClassLoaderRegistry;
 import org.gradle.initialization.DefaultClassLoaderRegistry;
 import org.gradle.initialization.DefaultJdkToolsInitializer;
@@ -77,11 +84,13 @@ import org.gradle.internal.instrumentation.agent.AgentStatus;
 import org.gradle.internal.logging.LoggingManagerInternal;
 import org.gradle.internal.operations.BuildOperationListenerManager;
 import org.gradle.internal.operations.BuildOperationProgressEventEmitter;
+import org.gradle.internal.operations.BuildOperationRunner;
 import org.gradle.internal.operations.CurrentBuildOperationRef;
 import org.gradle.internal.operations.DefaultBuildOperationProgressEventEmitter;
 import org.gradle.internal.problems.failure.DefaultFailureFactory;
 import org.gradle.internal.problems.failure.FailureFactory;
 import org.gradle.internal.reflect.DirectInstantiator;
+import org.gradle.internal.reflect.Instantiator;
 import org.gradle.internal.scripts.DefaultScriptFileResolver;
 import org.gradle.internal.scripts.DefaultScriptFileResolverListeners;
 import org.gradle.internal.scripts.ScriptFileResolvedListener;
@@ -107,6 +116,9 @@ import org.gradle.model.internal.manage.schema.extract.ModelSchemaAspectExtracti
 import org.gradle.model.internal.manage.schema.extract.ModelSchemaAspectExtractor;
 import org.gradle.model.internal.manage.schema.extract.ModelSchemaExtractionStrategy;
 import org.gradle.model.internal.manage.schema.extract.ModelSchemaExtractor;
+import org.gradle.process.internal.ClientExecHandleBuilderFactory;
+import org.gradle.process.internal.DefaultExecActionFactory;
+import org.gradle.process.internal.ExecFactory;
 import org.gradle.process.internal.health.memory.DefaultJvmMemoryInfo;
 import org.gradle.process.internal.health.memory.DefaultMemoryManager;
 import org.gradle.process.internal.health.memory.DefaultOsMemoryInfo;
@@ -157,7 +169,7 @@ public class GlobalScopeServices extends WorkerSharedGlobalScopeServices {
         BuildOperationListenerManager listenerManager
     ) {
         return new DefaultBuildOperationProgressEventEmitter(
-            clock::getCurrentTime,
+            clock,
             currentBuildOperationRef,
             listenerManager.getBroadcaster()
         );
@@ -188,6 +200,11 @@ public class GlobalScopeServices extends WorkerSharedGlobalScopeServices {
     @Provides
     InMemoryCacheDecoratorFactory createInMemoryTaskArtifactCache(CrossBuildInMemoryCacheFactory cacheFactory) {
         return new CleaningInMemoryCacheDecoratorFactory(environment.isLongLivingProcess(), cacheFactory);
+    }
+
+    @Provides
+    CacheCleanupStrategyFactory createCacheCleanupStrategyFactory(BuildOperationRunner buildOperationRunner) {
+        return new DefaultCacheCleanupStrategyFactory(buildOperationRunner);
     }
 
     @Provides
@@ -280,6 +297,29 @@ public class GlobalScopeServices extends WorkerSharedGlobalScopeServices {
     }
 
     @Provides
+    ExecFactory createExecFactory(
+        FileResolver fileResolver,
+        FileCollectionFactory fileCollectionFactory,
+        Instantiator instantiator,
+        ObjectFactory objectFactory,
+        ExecutorFactory executorFactory,
+        TemporaryFileProvider temporaryFileProvider,
+        BuildCancellationToken buildCancellationToken,
+        ClientExecHandleBuilderFactory execHandleFactory
+    ) {
+        return DefaultExecActionFactory.of(
+            fileResolver,
+            fileCollectionFactory,
+            instantiator,
+            executorFactory,
+            temporaryFileProvider,
+            buildCancellationToken,
+            objectFactory,
+            execHandleFactory
+        );
+    }
+
+    @Provides
     DomainObjectCollectionFactory createDomainObjectCollectionFactory(InstantiatorFactory instantiatorFactory, ServiceRegistry services) {
         return new DefaultDomainObjectCollectionFactory(instantiatorFactory, services, CollectionCallbackActionDecorator.NOOP, MutationGuards.identity());
     }
@@ -343,5 +383,10 @@ public class GlobalScopeServices extends WorkerSharedGlobalScopeServices {
     @Provides
     FailureFactory createFailureFactory() {
         return DefaultFailureFactory.withDefaultClassifier();
+    }
+
+    @Provides
+    ScriptSourceHasher createScriptSourceHasher() {
+        return new DefaultScriptSourceHasher();
     }
 }

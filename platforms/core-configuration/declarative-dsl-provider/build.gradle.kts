@@ -19,36 +19,38 @@ plugins {
 }
 
 dependencies {
-    api(projects.serviceProvider)
     api(projects.core)
     api(projects.coreApi)
     api(projects.declarativeDslApi)
     api(projects.declarativeDslCore)
     api(projects.declarativeDslEvaluator)
     api(projects.declarativeDslToolingModels)
+    api(projects.serviceProvider)
+    api(projects.stdlibJavaExtensions)
+
     api(libs.kotlinStdlib)
+    api(libs.inject)
 
-
-    implementation(libs.inject)
-    testImplementation(libs.mockitoKotlin2)
-
+    implementation(projects.concurrent)
+    implementation(projects.declarativeDslInternalUtils)
     implementation(projects.baseServices)
+    implementation(projects.messaging)
     implementation(projects.resources)
     implementation(projects.serviceLookup)
-
     implementation(libs.guava)
     implementation(libs.kotlinReflect)
+
+    testImplementation(libs.mockitoKotlin2)
 
     integTestImplementation(projects.internalTesting)
     integTestImplementation(projects.logging)
     integTestImplementation(testFixtures(projects.declarativeDslProvider))
+    integTestImplementation(testFixtures(projects.toolingApi))
 
     testFixturesImplementation(projects.internalTesting)
     testFixturesImplementation(projects.internalIntegTesting)
 
     integTestDistributionRuntimeOnly(projects.distributionsFull)
-
-    integTestImplementation(testFixtures(projects.toolingApi))
 }
 tasks.isolatedProjectsIntegTest {
     enabled = false

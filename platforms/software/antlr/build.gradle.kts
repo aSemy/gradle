@@ -1,6 +1,5 @@
 plugins {
     id("gradlebuild.distribution.api-java")
-    id("gradlebuild.instrumented-java-project")
 }
 
 description = "Adds support for generating parsers from Antlr grammars."
@@ -16,6 +15,7 @@ dependencies {
     api(projects.stdlibJavaExtensions)
     api(projects.core)
     api(projects.coreApi)
+    api(projects.fileOperations)
     api(projects.files)
     api(projects.modelCore)
 
@@ -49,7 +49,4 @@ dependencies {
 
 packageCycles {
     excludePatterns.add("org/gradle/api/plugins/antlr/internal/*")
-}
-tasks.isolatedProjectsIntegTest {
-    enabled = false
 }

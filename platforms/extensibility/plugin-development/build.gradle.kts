@@ -1,6 +1,5 @@
 plugins {
     id("gradlebuild.distribution.api-java")
-    id("gradlebuild.instrumented-java-project")
 }
 
 description = "Gradle plugin development plugins"
@@ -8,7 +7,6 @@ description = "Gradle plugin development plugins"
 errorprone {
     disabledChecks.addAll(
         "DefaultCharset", // 1 occurrences
-        "LoopOverCharArray", // 1 occurrences
     )
 }
 
@@ -37,6 +35,7 @@ dependencies {
     implementation(projects.buildOption)
     implementation(projects.dependencyManagement)
     implementation(projects.execution)
+    implementation(projects.fileOperations)
     implementation(projects.hashing)
     implementation(projects.ivy)
     implementation(projects.languageJava)
@@ -51,7 +50,6 @@ dependencies {
     implementation(projects.pluginsJavaLibrary)
     implementation(projects.pluginsJvmTestSuite)
     implementation(projects.pluginUse)
-    implementation(projects.processServices)
     implementation(projects.publish)
     implementation(projects.testingJvm)
     implementation(projects.toolchainsJvm)

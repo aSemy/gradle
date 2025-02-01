@@ -56,6 +56,10 @@ public class ProjectLifecycleController implements Closeable {
         return project != null;
     }
 
+    public void assertConfigured() {
+        controller.assertInStateOrLater(State.Configured);
+    }
+
     public void createMutableModel(
         DefaultProjectDescriptor descriptor,
         BuildState build,
@@ -82,7 +86,7 @@ public class ProjectLifecycleController implements Closeable {
     }
 
     public void ensureSelfConfigured() {
-        controller.maybeTransitionIfNotCurrentlyTransitioning(State.Created, State.Configured, () -> project.evaluate());
+        controller.maybeTransitionIfNotCurrentlyTransitioning(State.Created, State.Configured, () -> project.evaluateUnchecked());
     }
 
     public void ensureTasksDiscovered() {

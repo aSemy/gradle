@@ -22,6 +22,7 @@ import org.gradle.declarative.dsl.schema.ConfigureAccessor
 import org.gradle.declarative.dsl.schema.DataConstructor
 import org.gradle.declarative.dsl.schema.DataTopLevelFunction
 import org.gradle.declarative.dsl.schema.SchemaMemberFunction
+import org.gradle.internal.declarativedsl.InstanceAndPublicType
 import org.gradle.internal.declarativedsl.analysis.ConfigureAccessorInternal
 import org.gradle.internal.declarativedsl.analysis.DefaultDataMemberFunction
 import org.gradle.internal.declarativedsl.analysis.FunctionSemanticsInternal
@@ -49,9 +50,11 @@ class AccessorTest {
             """
             configureCustomInstance {
                 x = 123
+                enum = B
             }""".trimIndent()
         )
         assertEquals(123, runtimeInstanceFromResult(schema, resolution, configureLambdas, runtimeCustomAccessors, ::MyReceiver).myHiddenInstance.value.x)
+        assertEquals(Enum.B, runtimeInstanceFromResult(schema, resolution, configureLambdas, runtimeCustomAccessors, ::MyReceiver).myHiddenInstance.value.enum)
     }
 
     @Test
@@ -79,10 +82,10 @@ class AccessorTest {
 
     // don't make this private, will produce failures on Java 8 (due to https://youtrack.jetbrains.com/issue/KT-37660)
     val runtimeCustomAccessors = object : RuntimeCustomAccessors {
-        override fun getObjectFromCustomAccessor(receiverObject: Any, accessor: ConfigureAccessor.Custom): Any? =
+        override fun getObjectFromCustomAccessor(receiverObject: Any, accessor: ConfigureAccessor.Custom): InstanceAndPublicType =
             if (receiverObject is MyReceiver && accessor.customAccessorIdentifier == "test")
-                receiverObject.myHiddenInstance.value
-            else null
+                InstanceAndPublicType.unknownPublicType(receiverObject.myHiddenInstance.value)
+            else InstanceAndPublicType.NULL
     }
 
     // don't make this private, will produce failures on Java 8 (due to https://youtrack.jetbrains.com/issue/KT-37660)
@@ -147,5 +150,12 @@ class AccessorTest {
 
         @get:Restricted
         var y: String = ""
+
+        @get:Restricted
+        var enum: Enum = Enum.A
+    }
+
+    enum class Enum {
+        A, B, C
     }
 }

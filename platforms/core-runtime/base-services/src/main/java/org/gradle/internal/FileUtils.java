@@ -23,6 +23,7 @@ import org.gradle.api.UncheckedIOException;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -98,7 +99,7 @@ public class FileUtils {
      * <p>
      * This method does not access the file system.
      * It is agnostic to whether a given file object represents a regular file, directory or does not exist.
-     * That is, the term “file” is used in the java.io.File sense, not the regular file sense.
+     * That is, the term "file" is used in the java.io.File sense, not the regular file sense.
      *
      * @param files the site of files to find the encompassing roots of
      * @return the encompassing roots
@@ -106,7 +107,7 @@ public class FileUtils {
     public static Collection<? extends File> calculateRoots(Iterable<? extends File> files) {
         List<File> sortedFiles = Lists.newArrayList(files);
         Collections.sort(sortedFiles, FILE_SEGMENT_COMPARATOR);
-        List<File> result = Lists.newArrayListWithExpectedSize(sortedFiles.size());
+        List<File> result = new ArrayList<File>(sortedFiles.size());
 
         File currentRoot = null;
         for (File file : sortedFiles) {

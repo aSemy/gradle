@@ -15,21 +15,20 @@ tasks.named<JavaCompile>("jmhCompileGeneratedClasses") {
 }
 
 dependencies {
+    api(projects.baseServices)
+    api(projects.files)
+    api(projects.fileTemp)
     api(projects.serviceLookup)
     api(projects.serviceProvider)
-    api(projects.files)
+    api(projects.stdlibJavaExtensions)
 
     api(libs.inject)
     api(libs.jsr305)
     api(libs.nativePlatform)
 
-    api(projects.baseServices)
-    api(projects.fileTemp)
-    api(projects.stdlibJavaExtensions)
-
     implementation(projects.serviceRegistryBuilder)
 
-    implementation(libs.nativePlatformFileEvents)
+    implementation(libs.gradleFileEvents)
     implementation(libs.slf4jApi)
     implementation(libs.guava)
     implementation(libs.commonsIo)
@@ -49,6 +48,8 @@ jmh {
     warmupIterations = 10
     synchronizeIterations = false
 }
-tasks.isolatedProjectsIntegTest {
-    enabled = false
+
+packageCycles {
+    // Cycle between public interface, Factory and implementation class in internal package
+    excludePatterns.add("org/gradle//platform/internal/**")
 }

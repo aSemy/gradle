@@ -28,9 +28,10 @@ pluginManagement {
 
 plugins {
     id("gradlebuild.build-environment")
-    id("com.gradle.develocity").version("3.17.6") // Run `build-logic-settings/update-develocity-plugin-version.sh <new-version>` to update
-    id("io.github.gradle.gradle-enterprise-conventions-plugin").version("0.10.1")
-    id("org.gradle.toolchains.foojay-resolver-convention").version ("0.8.0")
+    id("gradlebuild.configuration-cache-compatibility")
+    id("com.gradle.develocity").version("3.19.1") // Run `java build-logic-settings/UpdateDevelocityPluginVersion.java <new-version>` to update
+    id("io.github.gradle.gradle-enterprise-conventions-plugin").version("0.10.2")
+    id("org.gradle.toolchains.foojay-resolver-convention").version("0.9.0")
 }
 
 includeBuild("build-logic-commons")
@@ -61,7 +62,6 @@ unassigned {
 unassigned {
     subproject("core")
     subproject("build-events")
-    subproject("diagnostics")
     subproject("composite-builds")
     subproject("core-api")
 }
@@ -118,6 +118,7 @@ val core = platform("core") {
         subproject("service-registry-impl")
         subproject("time")
         subproject("tooling-api-provider")
+        subproject("versioned-cache")
         subproject("wrapper-main")
         subproject("wrapper-shared")
     }
@@ -125,6 +126,7 @@ val core = platform("core") {
     // Core Configuration Module
     module("core-configuration") {
         subproject("api-metadata")
+        subproject("base-diagnostics")
         subproject("base-services-groovy")
         subproject("bean-serialization-services")
         subproject("configuration-cache")
@@ -138,9 +140,11 @@ val core = platform("core") {
         subproject("declarative-dsl-provider")
         subproject("declarative-dsl-tooling-models")
         subproject("declarative-dsl-tooling-builders")
+        subproject("declarative-dsl-internal-utils")
         subproject("dependency-management-serialization-codecs")
         subproject("encryption-services")
         subproject("file-collections")
+        subproject("file-operations")
         subproject("flow-services")
         subproject("graph-serialization")
         subproject("guava-serialization-codecs")
@@ -203,6 +207,8 @@ val software = platform("software") {
     uses(core)
     subproject("antlr")
     subproject("build-init")
+    subproject("build-init-specs")
+    subproject("build-init-specs-api")
     subproject("dependency-management")
     subproject("plugins-distribution")
     subproject("distributions-publishing")
@@ -219,6 +225,7 @@ val software = platform("software") {
     subproject("reporting")
     subproject("security")
     subproject("signing")
+    subproject("software-diagnostics")
     subproject("testing-base")
     subproject("testing-base-infrastructure")
     subproject("test-suites-base")
@@ -327,8 +334,8 @@ gradle.settingsEvaluated {
         return@settingsEvaluated
     }
 
-    if (!JavaVersion.current().isJava11) {
-        throw GradleException("This build requires JDK 11. It's currently ${getBuildJavaHome()}. You can ignore this check by passing '-Dorg.gradle.ignoreBuildJavaVersionCheck=true'.")
+    if (JavaVersion.current() != JavaVersion.VERSION_17) {
+        throw GradleException("This build requires JDK 17. It's currently ${getBuildJavaHome()}. You can ignore this check by passing '-Dorg.gradle.ignoreBuildJavaVersionCheck=true'.")
     }
 }
 

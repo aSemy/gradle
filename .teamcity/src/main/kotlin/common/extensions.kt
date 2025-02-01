@@ -20,8 +20,6 @@ import common.KillProcessMode.KILL_ALL_GRADLE_PROCESSES
 import configurations.CompileAll
 import configurations.FunctionalTest
 import configurations.branchesFilterExcluding
-import configurations.buildScanCustomValue
-import configurations.buildScanTag
 import configurations.checkCleanDirUnixLike
 import configurations.checkCleanDirWindows
 import configurations.enablePullRequestFeature
@@ -37,6 +35,7 @@ import jetbrains.buildServer.configs.kotlin.Project
 import jetbrains.buildServer.configs.kotlin.RelativeId
 import jetbrains.buildServer.configs.kotlin.Requirements
 import jetbrains.buildServer.configs.kotlin.buildSteps.GradleBuildStep
+import jetbrains.buildServer.configs.kotlin.buildSteps.exec
 import jetbrains.buildServer.configs.kotlin.buildSteps.script
 import jetbrains.buildServer.configs.kotlin.failureConditions.BuildFailureOnText
 import jetbrains.buildServer.configs.kotlin.failureConditions.failOnText
@@ -79,6 +78,10 @@ fun Requirements.requiresArch(os: Os, arch: Arch) {
     }
 }
 
+fun Requirements.requiresEc2Agent() {
+    matches("teamcity.agent.name", "^(ec|EC)2-.*$")
+}
+
 fun Requirements.requiresNotEc2Agent() {
     doesNotContain("teamcity.agent.name", "ec2")
     // US region agents have name "EC2-XXX"
@@ -110,7 +113,7 @@ fun BuildType.applyDefaultSettings(os: Os = Os.LINUX, arch: Arch = Arch.AMD64, b
         subprojects/internal-build-reports/build/reports/incubation/all-incubating.html => incubation-reports
         testing/architecture-test/build/reports/binary-compatibility/report.html => binary-compatibility-reports
         build/reports/dependency-verification/** => dependency-verification-reports
-        build/*/problem-report.html => problem-reports
+        build/reports/problems/problems-report.html
     """.trimIndent()
 
     paramsForBuildToolBuild(buildJvm, os, arch)
@@ -150,9 +153,23 @@ fun BuildType.applyDefaultSettings(os: Os = Os.LINUX, arch: Arch = Arch.AMD64, b
             }
         }
     }
+
+    if (os !in listOf(Os.WINDOWS, Os.MACOS)) {
+        steps {
+            exec {
+                name = "EC2_BUILD_CUSTOMIZATIONS"
+                executionMode = BuildStep.ExecutionMode.ALWAYS
+                path = ".teamcity/scripts/configure_build_env_on_ec2.sh"
+
+                conditions {
+                    requiresEc2Agent()
+                }
+            }
+        }
+    }
 }
 
-fun javaHome(jvm: Jvm, os: Os, arch: Arch = Arch.AMD64) = "%${os.name.lowercase()}.${jvm.version}.${jvm.vendor}.${arch.suffix}%"
+fun javaHome(jvm: Jvm, os: Os, arch: Arch = Arch.AMD64) = "%${if (os == Os.ALPINE) "linux" else os.name.lowercase()}.${jvm.version}.${jvm.vendor}.${arch.suffix}%"
 
 fun BuildType.paramsForBuildToolBuild(buildJvm: Jvm = BuildToolBuildJvm, os: Os, arch: Arch = Arch.AMD64) {
     params {
@@ -201,7 +218,7 @@ fun BuildSteps.checkCleanM2AndAndroidUserHome(os: Os = Os.LINUX, buildType: Buil
 
 fun BuildStep.onlyRunOnGitHubMergeQueueBranch() {
     conditions {
-        matches("teamcity.build.branch", "(pre-test/.*)|(gh-readonly-queue/.*)")
+        matches("teamcity.build.branch", "gh-readonly-queue/.*")
     }
 }
 
@@ -249,7 +266,13 @@ fun Dependencies.compileAllDependency(compileAllId: String) {
     }
 }
 
-fun functionalTestExtraParameters(buildScanTag: String, os: Os, arch: Arch, testJvmVersion: String, testJvmVendor: String): String {
+fun functionalTestExtraParameters(
+    buildScanTags: List<String>,
+    os: Os,
+    arch: Arch,
+    testJvmVersion: String,
+    testJvmVendor: String
+): String {
     val buildScanValues = mapOf(
         "coverageOs" to os.name.lowercase(),
         "coverageArch" to arch.name.lowercase(),
@@ -261,8 +284,8 @@ fun functionalTestExtraParameters(buildScanTag: String, os: Os, arch: Arch, test
             "-PtestJavaVersion=$testJvmVersion",
             "-PtestJavaVendor=$testJvmVendor"
         ) +
-            listOf(buildScanTag(buildScanTag)) +
-            buildScanValues.map { buildScanCustomValue(it.key, it.value) }
+            buildScanTags.map { buildScanTagParam(it) } +
+            buildScanValues.map { buildScanCustomValueParam(it.key, it.value) }
         ).filter { it.isNotBlank() }.joinToString(separator = " ")
 }
 
@@ -275,8 +298,22 @@ fun functionalTestParameters(os: Os, arch: Arch = Arch.AMD64): List<String> {
     )
 }
 
-fun promotionBuildParameters(dependencyBuildId: RelativeId, extraParameters: String, gitUserName: String, gitUserEmail: String) =
-    """-PcommitId=%dep.$dependencyBuildId.build.vcs.number% $extraParameters "-PgitUserName=$gitUserName" "-PgitUserEmail=$gitUserEmail" $pluginPortalUrlOverride %additional.gradle.parameters%"""
+fun promotionBuildParameters(
+    dependencyBuildId: RelativeId,
+    extraParameters: String,
+    gitUserName: String,
+    gitUserEmail: String
+): String {
+    return listOf(
+        "-PcommitId=%dep.$dependencyBuildId.build.vcs.number%",
+        extraParameters,
+        "\"-PgitUserName=$gitUserName\"",
+        "\"-PgitUserEmail=$gitUserEmail\"",
+        pluginPortalUrlOverride,
+        "-DenablePredictiveTestSelection=false",
+        "%additional.gradle.parameters%"
+    ).joinToString(" ")
+}
 
 /**
  * Align with build-logic/cleanup/src/main/java/gradlebuild/cleanup/services/KillLeakingJavaProcesses.java

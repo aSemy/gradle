@@ -18,6 +18,8 @@ package org.gradle.api.artifacts.repositories;
 import org.gradle.api.Action;
 import org.gradle.api.ActionConfiguration;
 import org.gradle.api.artifacts.ComponentMetadataSupplier;
+import org.gradle.internal.instrumentation.api.annotations.NotToBeReplacedByLazyProperty;
+import org.gradle.internal.instrumentation.api.annotations.ToBeReplacedByLazyProperty;
 
 import java.net.URI;
 
@@ -50,6 +52,7 @@ public interface IvyArtifactRepository extends ArtifactRepository, UrlArtifactRe
      * @return The URL.
      */
     @Override
+    @ToBeReplacedByLazyProperty
     URI getUrl();
 
     /**
@@ -102,7 +105,7 @@ public interface IvyArtifactRepository extends ArtifactRepository, UrlArtifactRe
      * <p>
      * Recognised values are as follows:
      * </p>
-     * <h2>'gradle'</h2>
+     * <h4>'gradle'</h4>
      * <p>
      * A Repository Layout that applies the following patterns:
      * </p>
@@ -110,7 +113,7 @@ public interface IvyArtifactRepository extends ArtifactRepository, UrlArtifactRe
      *     <li>Artifacts: <code>$baseUri/{@value #GRADLE_ARTIFACT_PATTERN}</code></li>
      *     <li>Ivy: <code>$baseUri/{@value #GRADLE_IVY_PATTERN}</code></li>
      * </ul>
-     * <h2>'maven'</h2>
+     * <h4>'maven'</h4>
      * <p>
      * A Repository Layout that applies the following patterns:
      * </p>
@@ -121,7 +124,7 @@ public interface IvyArtifactRepository extends ArtifactRepository, UrlArtifactRe
      * <p>
      * Following the Maven convention, the 'organisation' value is further processed by replacing '.' with '/'.
      * </p>
-     * <h2>'ivy'</h2>
+     * <h4>'ivy'</h4>
      * <p>
      * A Repository Layout that applies the following patterns:
      * </p>
@@ -162,6 +165,7 @@ public interface IvyArtifactRepository extends ArtifactRepository, UrlArtifactRe
      *
      * @return The meta-data provider for this repository.
      */
+    @NotToBeReplacedByLazyProperty(because = "Not settable property")
     IvyArtifactRepositoryMetaDataProvider getResolve();
 
     /**
@@ -202,6 +206,7 @@ public interface IvyArtifactRepository extends ArtifactRepository, UrlArtifactRe
      *
      * @since 6.4
      */
+    @NotToBeReplacedByLazyProperty(because = "Not settable property")
     MetadataSources getMetadataSources();
 
     /**

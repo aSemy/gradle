@@ -26,11 +26,12 @@ import org.apache.commons.io.FileUtils;
 import org.gradle.api.internal.file.temp.DefaultTemporaryFileProvider;
 import org.gradle.api.internal.file.temp.TemporaryFileProvider;
 import org.gradle.cache.CacheCleanupStrategy;
-import org.gradle.cache.DefaultCacheCleanupStrategy;
+import org.gradle.cache.CacheCleanupStrategyFactory;
 import org.gradle.cache.FileLockManager;
 import org.gradle.cache.PersistentCache;
 import org.gradle.cache.internal.CacheFactory;
 import org.gradle.cache.internal.DefaultCacheBuilder;
+import org.gradle.cache.internal.DefaultCacheCleanupStrategyFactory;
 import org.gradle.cache.internal.DefaultCacheFactory;
 import org.gradle.cache.internal.DefaultFileLockManager;
 import org.gradle.cache.internal.LeastRecentlyUsedCacheCleanup;
@@ -73,7 +74,6 @@ import org.gradle.internal.operations.BuildOperationListener;
 import org.gradle.internal.operations.BuildOperationProgressEventEmitter;
 import org.gradle.internal.operations.BuildOperationRunner;
 import org.gradle.internal.operations.BuildOperationState;
-import org.gradle.internal.operations.BuildOperationTimeSupplier;
 import org.gradle.internal.operations.CurrentBuildOperationRef;
 import org.gradle.internal.operations.DefaultBuildOperationIdFactory;
 import org.gradle.internal.operations.DefaultBuildOperationProgressEventEmitter;
@@ -84,6 +84,8 @@ import org.gradle.internal.operations.OperationProgressEvent;
 import org.gradle.internal.operations.OperationStartEvent;
 import org.gradle.internal.snapshot.SnapshotHierarchy;
 import org.gradle.internal.snapshot.impl.DirectorySnapshotterStatistics;
+import org.gradle.internal.time.Clock;
+import org.gradle.internal.time.Time;
 import org.gradle.internal.time.TimestampSuppliers;
 import org.gradle.internal.vfs.FileSystemAccess;
 import org.gradle.internal.vfs.VirtualFileSystem;
@@ -101,7 +103,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
-import java.util.Collections;
 import java.util.function.Supplier;
 
 import static org.gradle.cache.FileLockManager.LockMode.OnDemand;
@@ -151,6 +152,11 @@ class BuildCacheClientModule extends AbstractModule {
     }
 
     @Provides
+    CacheCleanupStrategyFactory createCacheCleanupStrategyFactory(BuildOperationRunner buildOperationRunner) {
+        return new DefaultCacheCleanupStrategyFactory(buildOperationRunner);
+    }
+
+    @Provides
     ExecutorFactory createExecutorFactory() {
         return new DefaultExecutorFactory();
     }
@@ -164,9 +170,9 @@ class BuildCacheClientModule extends AbstractModule {
             }
 
             @Override
-            public Iterable<InetAddress> getCommunicationAddresses() {
+            public InetAddress getCommunicationAddress() {
                 try {
-                    return Collections.singleton(InetAddress.getByName(null));
+                    return InetAddress.getByName(null);
                 } catch (UnknownHostException e) {
                     throw new RuntimeException(e);
                 }
@@ -192,8 +198,8 @@ class BuildCacheClientModule extends AbstractModule {
     }
 
     @Provides
-    CacheFactory createCacheFactory(FileLockManager fileLockManager, ExecutorFactory executorFactory, BuildOperationRunner buildOperationRunner) {
-        return new DefaultCacheFactory(fileLockManager, executorFactory, buildOperationRunner);
+    CacheFactory createCacheFactory(FileLockManager fileLockManager, ExecutorFactory executorFactory) {
+        return new DefaultCacheFactory(fileLockManager, executorFactory);
     }
 
     private static class LocalBuildCacheModule extends PrivateModule {
@@ -234,11 +240,11 @@ class BuildCacheClientModule extends AbstractModule {
     }
 
     @Provides
-    CacheCleanupStrategy createCacheCleanupStrategy(FileAccessTimeJournal fileAccessTimeJournal) {
+    CacheCleanupStrategy createCacheCleanupStrategy(FileAccessTimeJournal fileAccessTimeJournal, CacheCleanupStrategyFactory factory) {
         SingleDepthFilesFinder filesFinder = new SingleDepthFilesFinder(1);
         Supplier<Long> removeUnusedEntriesOlderThan = TimestampSuppliers.daysAgo(1);
         LeastRecentlyUsedCacheCleanup cleanupAction = new LeastRecentlyUsedCacheCleanup(filesFinder, fileAccessTimeJournal, removeUnusedEntriesOlderThan);
-        return DefaultCacheCleanupStrategy.from(cleanupAction);
+        return factory.daily(cleanupAction);
     }
 
     @Provides
@@ -258,7 +264,7 @@ class BuildCacheClientModule extends AbstractModule {
     @Provides
     BuildOperationRunner createBuildOperationRunner(
         CurrentBuildOperationRef currentBuildOperationRef,
-        BuildOperationTimeSupplier timeSupplier,
+        Clock timeSupplier,
         BuildOperationIdFactory buildOperationIdFactory,
         DefaultBuildOperationRunner.BuildOperationExecutionListenerFactory buildOperationExecutionListenerFactory
     ) {
@@ -307,7 +313,7 @@ class BuildCacheClientModule extends AbstractModule {
 
     @Provides
     BuildOperationProgressEventEmitter createBuildOperationProgressEventEmitter(
-        BuildOperationTimeSupplier timeSupplier,
+        Clock timeSupplier,
         CurrentBuildOperationRef currentBuildOperationRef,
         BuildOperationListener buildOperationListener
     ) {
@@ -347,8 +353,8 @@ class BuildCacheClientModule extends AbstractModule {
     }
 
     @Provides
-    BuildOperationTimeSupplier createTimeSupplier() {
-        return System::currentTimeMillis;
+    Clock createTimeSupplier() {
+        return Time.clock();
     }
 
     @Provides

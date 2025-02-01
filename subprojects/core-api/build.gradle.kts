@@ -1,28 +1,23 @@
 plugins {
     id("gradlebuild.distribution.api-java")
-    id("gradlebuild.instrumented-java-project")
 }
 
 description = "Public and internal 'core' Gradle APIs that are required by other subprojects"
 
 errorprone {
     disabledChecks.addAll(
-        "EmptyBlockTag", // 5 occurrences
         "InlineMeSuggester", // 1 occurrences
         "MalformedInlineTag", // 3 occurrences
         "MixedMutabilityReturnType", // 3 occurrences
         "NonApiType", // 1 occurrences
-        "ObjectEqualsForPrimitives", // 2 occurrences
         "ReferenceEquality", // 2 occurrences
         "StringCharset", // 1 occurrences
-        "UnusedMethod", // 1 occurrences
     )
 }
 
 dependencies {
     compileOnly(libs.jetbrainsAnnotations)
 
-    api(projects.processServices)
     api(projects.stdlibJavaExtensions)
     api(projects.buildCacheSpi)
     api(projects.loggingApi)

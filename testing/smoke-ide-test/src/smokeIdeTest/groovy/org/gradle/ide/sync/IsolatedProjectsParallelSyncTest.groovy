@@ -17,10 +17,9 @@
 package org.gradle.ide.sync
 
 import org.gradle.test.fixtures.server.http.BlockingHttpServer
-import org.gradle.util.internal.ToBeImplemented
 import org.junit.Rule
 
-class IsolatedProjectsParallelSyncTest extends AbstractIdeaSyncTest {
+class IsolatedProjectsParallelSyncTest extends AbstractIdeSyncTest {
 
     @Rule
     BlockingHttpServer server = new BlockingHttpServer(5_000)
@@ -29,19 +28,14 @@ class IsolatedProjectsParallelSyncTest extends AbstractIdeaSyncTest {
         server.start()
     }
 
-    @ToBeImplemented
     def 'projects are configured in parallel during IDEA sync'() {
         given:
         simpleProject()
         server.expect("configure-root")
-        server.expect("configure-a")
-        server.expect("configure-b")
-        // TODO: isolated expected behaviour for parallel sync
-//        server.expect("configure-root")
-//        server.expectConcurrent("configure-a", "configure-b")
+        server.expectConcurrent("configure-a", "configure-b")
 
         expect:
-        ideaSync(IDEA_VERSION)
+        ideaSync(IDEA_COMMUNITY_VERSION)
     }
 
     private void simpleProject() {

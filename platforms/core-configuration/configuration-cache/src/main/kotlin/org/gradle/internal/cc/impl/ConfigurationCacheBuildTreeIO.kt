@@ -25,11 +25,16 @@ import org.gradle.internal.cc.impl.serialize.Codecs
 import org.gradle.internal.serialize.graph.CloseableReadContext
 import org.gradle.internal.serialize.graph.CloseableWriteContext
 import org.gradle.internal.serialize.graph.MutableReadContext
+import org.gradle.internal.serialize.graph.SpecialDecoders
+import org.gradle.internal.serialize.graph.SpecialEncoders
 import org.gradle.internal.serialize.graph.WriteContext
+import org.gradle.internal.service.scopes.Scope
+import org.gradle.internal.service.scopes.ServiceScope
 import org.gradle.util.Path
 import java.io.InputStream
 import java.io.OutputStream
 
+@ServiceScope(Scope.Build::class)
 internal
 interface ConfigurationCacheBuildTreeIO : ConfigurationCacheOperationIO {
 
@@ -62,17 +67,26 @@ interface ConfigurationCacheBuildTreeIO : ConfigurationCacheOperationIO {
     /**
      * @param profile the unique name associated with the output stream for debugging space usage issues
      */
-    fun writeContextFor(stateType: StateType, outputStream: () -> OutputStream, profile: () -> String): Pair<CloseableWriteContext, Codecs>
+    fun writeContextFor(
+        name: String,
+        stateType: StateType,
+        outputStream: () -> OutputStream,
+        profile: () -> String,
+        specialEncoders: SpecialEncoders = SpecialEncoders(),
+    ): Pair<CloseableWriteContext, Codecs>
 
     fun <R> withReadContextFor(
         stateFile: ConfigurationCacheStateFile,
+        specialDecoders: SpecialDecoders = SpecialDecoders(),
         readOperation: suspend MutableReadContext.(Codecs) -> R
     ): R =
-        withReadContextFor(stateFile.stateType, stateFile::inputStream, readOperation)
+        withReadContextFor(stateFile.stateFile.name, stateFile.stateType, stateFile::inputStream, specialDecoders, readOperation)
 
     fun <R> withReadContextFor(
+        name: String,
         stateType: StateType,
         inputStream: () -> InputStream,
+        specialDecoders: SpecialDecoders = SpecialDecoders(),
         readOperation: suspend MutableReadContext.(Codecs) -> R
     ): R
 
@@ -85,14 +99,24 @@ interface ConfigurationCacheBuildTreeIO : ConfigurationCacheOperationIO {
     fun <R> withWriteContextFor(
         stateFile: ConfigurationCacheStateFile,
         profile: () -> String,
+        specialEncoders: SpecialEncoders = SpecialEncoders(),
         writeOperation: suspend WriteContext.(Codecs) -> R
     ): R =
-        withWriteContextFor(stateFile.stateType, stateFile::outputStream, profile, writeOperation)
+        withWriteContextFor(stateFile.stateFile.name, stateFile.stateType, stateFile::outputStream, profile, specialEncoders, writeOperation)
 
     fun <R> withWriteContextFor(
+        name: String,
         stateType: StateType,
         outputStream: () -> OutputStream,
         profile: () -> String,
+        specialEncoders: SpecialEncoders,
         writeOperation: suspend WriteContext.(Codecs) -> R
     ): R
+
+    fun readCandidateEntries(stateFile: ConfigurationCacheStateFile): List<CandidateEntry>
+    fun writeCandidateEntries(stateFile: ConfigurationCacheStateFile, entries: List<CandidateEntry>)
 }
+
+data class CandidateEntry(
+    val id: String
+)

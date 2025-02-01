@@ -14,16 +14,13 @@ errorprone {
         "AmbiguousMethodReference", // 1 occurrences
         "ClassCanBeStatic",
         "DefaultCharset", // 3 occurrences
-        "EmptyBlockTag", // 2 occurrences
         "Finally", // 4 occurrences
-        "HidingField", // 1 occurrences
         "IdentityHashMapUsage", // 2 occurrences
         "ImmutableEnumChecker", // 2 occurrences
         "InconsistentCapitalization", // 2 occurrences
         "InlineFormatString", // 5 occurrences
         "InlineMeSuggester", // 2 occurrences
         "InvalidParam", // 1 occurrences
-        "LoopOverCharArray", // 1 occurrences
         "MathAbsoluteNegative",
         "MissingCasesInEnumSwitch", // 7 occurrences
         "MixedMutabilityReturnType", // 5 occurrences
@@ -31,8 +28,6 @@ errorprone {
         "MutablePublicArray", // 1 occurrences
         "NonApiType", // 3 occurrences
         "NonCanonicalType", // 3 occurrences
-        "ObjectEqualsForPrimitives", // 3 occurrences
-        "OperatorPrecedence", // 2 occurrences
         "ReferenceEquality", // 10 occurrences
         "SameNameButDifferent", // 4 occurrences
         "StringCharset", // 1 occurrences
@@ -40,21 +35,16 @@ errorprone {
         "TypeParameterUnusedInFormals", // 2 occurrences
         "UndefinedEquals", // 1 occurrences
         "UnusedMethod", // 34 occurrences
-        "UnusedTypeParameter", // 1 occurrences
-        "UnusedVariable", // 6 occurrences
     )
 }
 
 
 dependencies {
-    api(projects.concurrent)
-    api(projects.stdlibJavaExtensions)
-    api(projects.serialization)
-    api(projects.serviceLookup)
-    api(projects.serviceProvider)
     api(projects.baseServices)
     api(projects.buildOperations)
     api(projects.buildOption)
+    api(projects.buildProcessServices)
+    api(projects.concurrent)
     api(projects.core)
     api(projects.coreApi)
     api(projects.enterpriseLogging)
@@ -72,8 +62,12 @@ dependencies {
     api(projects.problemsApi)
     api(projects.resources)
     api(projects.security)
+    api(projects.serialization)
+    api(projects.serviceLookup)
+    api(projects.serviceProvider)
     api(projects.snapshots)
-    api(projects.buildProcessServices)
+    api(projects.stdlibJavaExtensions)
+    api(projects.versionedCache)
 
     api(libs.bouncycastlePgp)
     api(libs.groovy)
@@ -85,6 +79,7 @@ dependencies {
     api(libs.maven3SettingsBuilder)
     api(libs.slf4jApi)
 
+    implementation(projects.fileOperations)
     implementation(projects.time)
     implementation(projects.baseAsm)
     implementation(projects.baseServicesGroovy)
@@ -102,12 +97,14 @@ dependencies {
     implementation(libs.httpcore)
 
     testImplementation(projects.buildCachePackaging)
-    testImplementation(projects.diagnostics)
+    testImplementation(projects.softwareDiagnostics)
+
     testImplementation(projects.processServices)
     testImplementation(libs.asmUtil)
     testImplementation(libs.commonsHttpclient)
     testImplementation(libs.groovyXml)
     testImplementation(libs.jsoup)
+
     testImplementation(testFixtures(projects.serialization))
     testImplementation(testFixtures(projects.baseServices))
     testImplementation(testFixtures(projects.core))
@@ -116,6 +113,7 @@ dependencies {
     testImplementation(testFixtures(projects.messaging))
     testImplementation(testFixtures(projects.resourcesHttp))
     testImplementation(testFixtures(projects.snapshots))
+    testImplementation(testFixtures(projects.toolingApi))
     testImplementation(testFixtures(projects.versionControl))
 
     integTestImplementation(projects.buildOption)
@@ -125,7 +123,8 @@ dependencies {
     integTestImplementation(libs.socksProxy) {
         because("SOCKS proxy not part of internal-integ-testing api, since it has limited usefulness, so must be explicitly depended upon")
     }
-    integTestImplementation(testFixtures(projects.security))
+    integTestImplementation(testFixtures(projects.core))
+    integTestImplementation(testFixtures(projects.signing))
     integTestImplementation(testFixtures(projects.modelCore))
 
     testFixturesApi(projects.baseServices) {

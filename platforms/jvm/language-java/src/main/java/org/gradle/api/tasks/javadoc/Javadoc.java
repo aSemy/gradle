@@ -23,6 +23,7 @@ import org.gradle.api.file.FileCollection;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.internal.file.FileTreeInternal;
+import org.gradle.api.internal.provider.PropertyFactory;
 import org.gradle.api.internal.tasks.compile.CompilationSourceDirs;
 import org.gradle.api.jvm.ModularitySpec;
 import org.gradle.api.model.ObjectFactory;
@@ -45,6 +46,7 @@ import org.gradle.api.tasks.javadoc.internal.JavadocSpec;
 import org.gradle.api.tasks.javadoc.internal.JavadocToolAdapter;
 import org.gradle.external.javadoc.MinimalJavadocOptions;
 import org.gradle.external.javadoc.StandardJavadocDocletOptions;
+import org.gradle.internal.deprecation.DeprecationLogger;
 import org.gradle.internal.file.Deleter;
 import org.gradle.internal.instrumentation.api.annotations.ToBeReplacedByLazyProperty;
 import org.gradle.internal.jvm.DefaultModularitySpec;
@@ -124,13 +126,14 @@ public abstract class Javadoc extends SourceTask {
 
     public Javadoc() {
         ObjectFactory objectFactory = getObjectFactory();
+        PropertyFactory propertyFactory = getPropertyFactory();
         this.modularity = objectFactory.newInstance(DefaultModularitySpec.class);
         JavaToolchainService javaToolchainService = getJavaToolchainService();
         Provider<JavadocTool> javadocToolConvention = getProviderFactory()
-            .provider(() -> JavadocExecutableUtils.getExecutableOverrideToolchainSpec(this, objectFactory))
+            .provider(() -> JavadocExecutableUtils.getExecutableOverrideToolchainSpec(this, propertyFactory))
             .flatMap(javaToolchainService::javadocToolFor)
             .orElse(javaToolchainService.javadocToolFor(it -> {}));
-        this.javadocTool = objectFactory.property(JavadocTool.class).convention(javadocToolConvention);
+        this.javadocTool = propertyFactory.property(JavadocTool.class).convention(javadocToolConvention);
         this.javadocTool.finalizeValueOnRead();
     }
 
@@ -307,10 +310,16 @@ public abstract class Javadoc extends SourceTask {
      * Returns whether Javadoc generation is accompanied by verbose output.
      *
      * @see #setVerbose(boolean)
+     * @deprecated This method duplicates the functionality of {@code getOptions().isVerbose()}. It will be removed in Gradle 9.0.
      */
+    @Deprecated
     @Internal
-    @ToBeReplacedByLazyProperty
     public boolean isVerbose() {
+        DeprecationLogger.deprecateMethod(Javadoc.class, "isVerbose()")
+            .replaceWith("getOptions().isVerbose()")
+            .willBeRemovedInGradle9()
+            .withUpgradeGuideSection(8, "deprecated_javadoc_verbose")
+            .nagUser();
         return options.isVerbose();
     }
 
@@ -319,10 +328,23 @@ public abstract class Javadoc extends SourceTask {
      * (by the underlying Ant task). Thus it is not handled by our logging.
      *
      * @param verbose Whether the output should be verbose.
+     * @deprecated This method duplicates the functionality of {@code getOptions().verbose()}. It will be removed in Gradle 9.0.
      */
+    @Deprecated
     public void setVerbose(boolean verbose) {
         if (verbose) {
+            DeprecationLogger.deprecateMethod(Javadoc.class, "setVerbose(true)")
+                .replaceWith("getOptions().verbose()")
+                .willBeRemovedInGradle9()
+                .withUpgradeGuideSection(8, "deprecated_javadoc_verbose")
+                .nagUser();
             options.verbose();
+        } else {
+            DeprecationLogger.deprecateMethod(Javadoc.class, "setVerbose(false)")
+                .withAdvice("Passing false to this method does nothing. You may want to call getOptions().quiet().")
+                .willBeRemovedInGradle9()
+                .withUpgradeGuideSection(8, "deprecated_javadoc_verbose")
+                .nagUser();
         }
     }
 
@@ -436,6 +458,11 @@ public abstract class Javadoc extends SourceTask {
 
     @Inject
     protected ObjectFactory getObjectFactory() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Inject
+    protected PropertyFactory getPropertyFactory() {
         throw new UnsupportedOperationException();
     }
 

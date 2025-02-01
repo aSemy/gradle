@@ -23,18 +23,19 @@ errorprone {
 
 dependencies {
     api(projects.serviceProvider)
+    api(projects.baseDiagnostics)
     api(projects.baseServices)
     api(projects.buildOperations)
     api(projects.core)
     api(projects.coreApi)
-    api(projects.diagnostics)
     api(projects.fileCollections)
     api(projects.files)
     api(projects.hashing)
-    api(projects.stdlibJavaExtensions)
     api(projects.logging)
     api(projects.modelCore)
     api(projects.native)
+    api(projects.softwareDiagnostics)
+    api(projects.stdlibJavaExtensions)
     api(projects.platformBase)
     api(projects.workers)
 
@@ -46,7 +47,6 @@ dependencies {
     implementation(projects.enterpriseLogging)
     implementation(projects.io)
     implementation(projects.loggingApi)
-    implementation(projects.processServices)
     implementation(projects.serviceLookup)
 
     implementation(libs.commonsLang)
@@ -74,9 +74,9 @@ dependencies {
     testImplementation(testFixtures(projects.messaging))
     testImplementation(testFixtures(projects.platformBase))
     testImplementation(testFixtures(projects.modelCore))
-    testImplementation(testFixtures(projects.diagnostics))
     testImplementation(testFixtures(projects.baseServices))
     testImplementation(testFixtures(projects.snapshots))
+    testImplementation(testFixtures(projects.time))
 
     testRuntimeOnly(projects.distributionsCore) {
         because("ProjectBuilder tests load services from a Gradle distribution.")

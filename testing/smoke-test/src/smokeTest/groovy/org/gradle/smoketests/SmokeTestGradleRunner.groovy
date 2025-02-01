@@ -46,6 +46,7 @@ class SmokeTestGradleRunner extends GradleRunner {
     private final List<String> expectedDeprecationWarnings = []
     private final List<String> maybeExpectedDeprecationWarnings = []
     private boolean ignoreDeprecationWarnings
+    private boolean expectStackTraces = false
     private boolean jdkWarningChecksOn = true
 
     SmokeTestGradleRunner(
@@ -93,8 +94,8 @@ class SmokeTestGradleRunner extends GradleRunner {
         // TODO: Should we filter using the stable/public build operation class names?
         // This means we need to load classes and do an instanceof when we filter
         String buildOperationFilter = [
-            "org.gradle.configurationcache.StoreDetails",
-            "org.gradle.configurationcache.LoadDetails",
+            "org.gradle.configurationcache.WorkGraphStoreDetails",
+            "org.gradle.configurationcache.WorkGraphLoadDetails",
         ].join(BuildOperationTrace.FILTER_SEPARATOR)
 
         delegate.withArguments(delegate.getArguments() + [
@@ -209,6 +210,12 @@ class SmokeTestGradleRunner extends GradleRunner {
         return this
     }
 
+    SmokeTestGradleRunner ignoreStackTraces(String reason) {
+        LOGGER.warn("Ignoring stack traces because: {}", reason)
+        expectStackTraces = true
+        return this
+    }
+
     SmokeTestGradleRunner ignoreDeprecationWarningsIf(boolean condition, String reason) {
         if (condition) {
             ignoreDeprecationWarnings(reason)
@@ -264,7 +271,7 @@ class SmokeTestGradleRunner extends GradleRunner {
             0,
             deprecationWarningsToCheck.collect { ExpectedDeprecationWarning.withMessage(it) },
             maybeExpectedDeprecationWarnings.collect { ExpectedDeprecationWarning.withMessage(it) },
-            false,
+            expectStackTraces,
             !ignoreDeprecationWarnings,
             jdkWarningChecksOn
         ).execute(execResult)

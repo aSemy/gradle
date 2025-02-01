@@ -22,6 +22,7 @@ import org.gradle.api.internal.ClassPathRegistry;
 import org.gradle.api.internal.CollectionCallbackActionDecorator;
 import org.gradle.api.internal.DocumentationRegistry;
 import org.gradle.api.internal.GradleInternal;
+import org.gradle.api.internal.artifacts.capability.CapabilitySelectorSerializer;
 import org.gradle.api.internal.artifacts.configurations.DependencyMetaDataProvider;
 import org.gradle.api.internal.artifacts.dsl.CapabilityNotationParser;
 import org.gradle.api.internal.artifacts.dsl.CapabilityNotationParserFactory;
@@ -29,6 +30,7 @@ import org.gradle.api.internal.artifacts.dsl.dependencies.DependencyConstraintFa
 import org.gradle.api.internal.artifacts.dsl.dependencies.DependencyFactoryInternal;
 import org.gradle.api.internal.artifacts.ivyservice.ArtifactCachesProvider;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ExternalModuleComponentResolverFactory;
+import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ResolverProviderFactories;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.StartParameterResolutionOverride;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.CachingVersionSelectorScheme;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.DefaultVersionComparator;
@@ -42,10 +44,7 @@ import org.gradle.api.internal.artifacts.ivyservice.modulecache.ModuleComponentR
 import org.gradle.api.internal.artifacts.ivyservice.modulecache.ModuleMetadataSerializer;
 import org.gradle.api.internal.artifacts.ivyservice.modulecache.ModuleSourcesSerializer;
 import org.gradle.api.internal.artifacts.ivyservice.modulecache.SuppliedComponentMetadataSerializer;
-import org.gradle.api.internal.artifacts.ivyservice.projectmodule.DefaultProjectPublicationRegistry;
 import org.gradle.api.internal.artifacts.ivyservice.resolveengine.artifact.ResolvedArtifactSetResolver;
-import org.gradle.api.internal.artifacts.ivyservice.resolveengine.artifact.ResolvedVariant;
-import org.gradle.api.internal.artifacts.ivyservice.resolveengine.artifact.ResolvedVariantCache;
 import org.gradle.api.internal.artifacts.ivyservice.resolveengine.excludes.ModuleExclusions;
 import org.gradle.api.internal.artifacts.ivyservice.resolveengine.result.AttributeContainerSerializer;
 import org.gradle.api.internal.artifacts.mvnsettings.DefaultLocalMavenRepositoryLocator;
@@ -63,17 +62,17 @@ import org.gradle.api.internal.artifacts.transform.TransformExecutionListener;
 import org.gradle.api.internal.artifacts.transform.TransformStepNodeDependencyResolver;
 import org.gradle.api.internal.artifacts.verification.signatures.DefaultSignatureVerificationServiceFactory;
 import org.gradle.api.internal.artifacts.verification.signatures.SignatureVerificationServiceFactory;
-import org.gradle.api.internal.attributes.ImmutableAttributesFactory;
+import org.gradle.api.internal.attributes.AttributesFactory;
 import org.gradle.api.internal.catalog.DefaultDependenciesAccessors;
 import org.gradle.api.internal.catalog.DependenciesAccessorsWorkspaceProvider;
 import org.gradle.api.internal.file.FileCollectionFactory;
-import org.gradle.api.internal.file.FileResolver;
 import org.gradle.api.internal.file.temp.TemporaryFileProvider;
 import org.gradle.api.internal.model.NamedObjectInstantiator;
 import org.gradle.api.internal.notations.ClientModuleNotationParserFactory;
 import org.gradle.api.internal.notations.DependencyConstraintNotationParser;
 import org.gradle.api.internal.notations.DependencyNotationParser;
 import org.gradle.api.internal.notations.ProjectDependencyFactory;
+import org.gradle.api.internal.project.ProjectStateRegistry;
 import org.gradle.api.internal.properties.GradleProperties;
 import org.gradle.api.internal.resources.ApiTextResourceAdapter;
 import org.gradle.api.internal.runtimeshaded.RuntimeShadedJarFactory;
@@ -128,8 +127,6 @@ import org.gradle.util.internal.SimpleMapInterner;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 /**
  * The set of dependency management services that are created per build in the tree.
@@ -137,10 +134,10 @@ import java.util.function.Function;
 class DependencyManagementBuildScopeServices implements ServiceRegistrationProvider {
     void configure(ServiceRegistration registration) {
         registration.add(TransformStepNodeDependencyResolver.class);
-        registration.add(DefaultProjectPublicationRegistry.class);
-        registration.add(FileResourceConnector.class);
+        registration.add(FileResourceRepository.class, FileResourceConnector.class);
         registration.add(ResolvedArtifactSetResolver.class);
         registration.add(ExternalModuleComponentResolverFactory.class);
+        registration.add(ResolverProviderFactories.class);
     }
 
     @Provides
@@ -148,18 +145,12 @@ class DependencyManagementBuildScopeServices implements ServiceRegistrationProvi
         Instantiator instantiator,
         UserCodeApplicationContext context,
         DependencyManagementServices dependencyManagementServices,
-        FileResolver fileResolver,
-        FileCollectionFactory fileCollectionFactory,
-        DependencyMetaDataProvider dependencyMetaDataProvider,
         ObjectFactory objects,
         CollectionCallbackActionDecorator collectionCallbackActionDecorator
     ) {
         return instantiator.newInstance(DefaultDependencyResolutionManagement.class,
             context,
             dependencyManagementServices,
-            fileResolver,
-            fileCollectionFactory,
-            dependencyMetaDataProvider,
             objects,
             collectionCallbackActionDecorator
         );
@@ -196,12 +187,13 @@ class DependencyManagementBuildScopeServices implements ServiceRegistrationProvi
     DefaultProjectDependencyFactory createProjectDependencyFactory(
         Instantiator instantiator,
         StartParameter startParameter,
-        ImmutableAttributesFactory attributesFactory,
+        AttributesFactory attributesFactory,
         TaskDependencyFactory taskDependencyFactory,
         CapabilityNotationParser capabilityNotationParser,
-        ObjectFactory objectFactory
+        ObjectFactory objectFactory,
+        ProjectStateRegistry projectStateRegistry
     ) {
-        return new DefaultProjectDependencyFactory(instantiator, startParameter.isBuildProjectDependencies(), capabilityNotationParser, objectFactory, attributesFactory, taskDependencyFactory);
+        return new DefaultProjectDependencyFactory(instantiator, startParameter.isBuildProjectDependencies(), capabilityNotationParser, objectFactory, attributesFactory, taskDependencyFactory, projectStateRegistry);
     }
 
     @Provides
@@ -211,7 +203,7 @@ class DependencyManagementBuildScopeServices implements ServiceRegistrationProvi
         ClassPathRegistry classPathRegistry,
         FileCollectionFactory fileCollectionFactory,
         RuntimeShadedJarFactory runtimeShadedJarFactory,
-        ImmutableAttributesFactory attributesFactory,
+        AttributesFactory attributesFactory,
         SimpleMapInterner stringInterner,
         CapabilityNotationParser capabilityNotationParser,
         ObjectFactory objectFactory
@@ -231,7 +223,7 @@ class DependencyManagementBuildScopeServices implements ServiceRegistrationProvi
         Instantiator instantiator,
         ObjectFactory objectFactory,
         DefaultProjectDependencyFactory factory,
-        ImmutableAttributesFactory attributesFactory,
+        AttributesFactory attributesFactory,
         SimpleMapInterner stringInterner
     ) {
         return new DefaultDependencyConstraintFactory(
@@ -334,26 +326,16 @@ class DependencyManagementBuildScopeServices implements ServiceRegistrationProvi
     }
 
     @Provides
-    ResolvedVariantCache createResolvedVariantCache() {
-        ConcurrentHashMap<ResolvedVariantCache.CacheKey, ResolvedVariant> map = new ConcurrentHashMap<>();
-        return new ResolvedVariantCache() {
-            @Override
-            public ResolvedVariant computeIfAbsent(ResolvedVariantCache.CacheKey key, Function<? super ResolvedVariantCache.CacheKey, ? extends ResolvedVariant> mappingFunction) {
-                return map.computeIfAbsent(key, mappingFunction);
-            }
-        };
-    }
-
-    @Provides
     VersionSelectorScheme createVersionSelectorScheme(VersionComparator versionComparator, VersionParser versionParser) {
         DefaultVersionSelectorScheme delegate = new DefaultVersionSelectorScheme(versionComparator, versionParser);
         return new CachingVersionSelectorScheme(delegate);
     }
 
     @Provides
-    ModuleComponentResolveMetadataSerializer createModuleComponentResolveMetadataSerializer(ImmutableAttributesFactory attributesFactory, MavenMutableModuleMetadataFactory mavenMetadataFactory, IvyMutableModuleMetadataFactory ivyMetadataFactory, ImmutableModuleIdentifierFactory moduleIdentifierFactory, NamedObjectInstantiator instantiator, ModuleSourcesSerializer moduleSourcesSerializer) {
+    ModuleComponentResolveMetadataSerializer createModuleComponentResolveMetadataSerializer(AttributesFactory attributesFactory, MavenMutableModuleMetadataFactory mavenMetadataFactory, IvyMutableModuleMetadataFactory ivyMetadataFactory, ImmutableModuleIdentifierFactory moduleIdentifierFactory, NamedObjectInstantiator instantiator, ModuleSourcesSerializer moduleSourcesSerializer) {
         DesugaringAttributeContainerSerializer attributeContainerSerializer = new DesugaringAttributeContainerSerializer(attributesFactory, instantiator);
-        return new ModuleComponentResolveMetadataSerializer(new ModuleMetadataSerializer(attributeContainerSerializer, mavenMetadataFactory, ivyMetadataFactory, moduleSourcesSerializer), attributeContainerSerializer, moduleIdentifierFactory);
+        CapabilitySelectorSerializer capabilitySelectorSerializer = new CapabilitySelectorSerializer();
+        return new ModuleComponentResolveMetadataSerializer(new ModuleMetadataSerializer(attributeContainerSerializer, capabilitySelectorSerializer, mavenMetadataFactory, ivyMetadataFactory, moduleSourcesSerializer), attributeContainerSerializer, capabilitySelectorSerializer, moduleIdentifierFactory);
     }
 
     @Provides
@@ -426,7 +408,7 @@ class DependencyManagementBuildScopeServices implements ServiceRegistrationProvi
         ExecutionEngine executionEngine,
         FeatureFlags featureFlags,
         FileCollectionFactory fileCollectionFactory,
-        ImmutableAttributesFactory attributesFactory,
+        AttributesFactory attributesFactory,
         CapabilityNotationParser capabilityNotationParser,
         InputFingerprinter inputFingerprinter
     ) {

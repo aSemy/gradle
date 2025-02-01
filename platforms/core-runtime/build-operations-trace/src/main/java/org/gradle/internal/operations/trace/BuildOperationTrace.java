@@ -16,18 +16,32 @@
 
 package org.gradle.internal.operations.trace;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.StandardSystemProperty;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationConfig;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
+import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Files;
-import com.google.common.io.LineProcessor;
-import groovy.json.JsonGenerator;
-import groovy.json.JsonOutput;
-import groovy.json.JsonSlurper;
 import org.gradle.StartParameter;
-import org.gradle.api.NonNullApi;
+import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.AttributeContainer;
+import org.gradle.internal.Cast;
 import org.gradle.internal.UncheckedException;
+import org.gradle.internal.buildoption.DefaultInternalOptions;
+import org.gradle.internal.buildoption.InternalFlag;
+import org.gradle.internal.buildoption.InternalOptions;
+import org.gradle.internal.buildoption.StringInternalOption;
 import org.gradle.internal.concurrent.Stoppable;
 import org.gradle.internal.operations.BuildOperationDescriptor;
 import org.gradle.internal.operations.BuildOperationListener;
@@ -40,14 +54,17 @@ import org.gradle.internal.service.scopes.Scope;
 import org.gradle.internal.service.scopes.ServiceScope;
 import org.gradle.util.internal.GFileUtils;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,20 +72,20 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.gradle.internal.Cast.uncheckedCast;
-import static org.gradle.internal.Cast.uncheckedNonnullCast;
 
 /**
  * Writes files describing the build operation stream for a build.
- * Can be enabled for any build with `-Dorg.gradle.internal.operations.trace=«path-base»`.
+ * Can be enabled for any build with {@code -Dorg.gradle.internal.operations.trace=«path-base»}.
  * <p>
  * Imposes no overhead when not enabled.
  * Also used as the basis for asserting on the event stream in integration tests, via BuildOperationFixture.
@@ -84,9 +101,12 @@ import static org.gradle.internal.Cast.uncheckedNonnullCast;
  * The JSON tree view can be used for more detailed analysis — open in a JSON tree viewer, like Chrome.
  * <p>
  * The «path-base» param is optional.
- * If invoked as `-Dorg.gradle.internal.operations.trace`, a base value of "operations" will be used.
+ * If invoked as {@code -Dorg.gradle.internal.operations.trace}, a base value of "operations" will be used.
  * <p>
- * The “trace” produced here is different to the trace produced by Gradle Profiler.
+ * The generation of trees can be very memory hungry and thus can be disabled with
+ * {@code -Dorg.gradle.internal.operations.trace.tree=false}.
+ * </p>
+ * The "trace" produced here is different to the trace produced by Gradle Profiler.
  * There, the focus is analyzing the performance profile.
  * Here, the focus is debugging/developing the information structure of build operations.
  *
@@ -96,6 +116,8 @@ import static org.gradle.internal.Cast.uncheckedNonnullCast;
 public class BuildOperationTrace implements Stoppable {
 
     public static final String SYSPROP = "org.gradle.internal.operations.trace";
+
+    private static final StringInternalOption TRACE_OPTION = new StringInternalOption(SYSPROP, null);
 
     /**
      * A list of either details or result class names, delimited by {@link #FILTER_SEPARATOR},
@@ -107,6 +129,16 @@ public class BuildOperationTrace implements Stoppable {
      * case, only the log file will be written, not the formatted tree output files.
      */
     public static final String FILTER_SYSPROP = SYSPROP + ".filter";
+
+    private static final StringInternalOption FILTER_OPTION = new StringInternalOption(FILTER_SYSPROP, null);
+
+    /**
+     * A flag controlling whether tree generation is enabled ({@code true} by default).
+     * Only application when {@link #FILTER_SYSPROP} is not set.
+     */
+    public static final String TREE_SYSPROP = SYSPROP + ".tree";
+
+    private static final InternalFlag TRACE_TREE_OPTION = new InternalFlag(TREE_SYSPROP, true);
 
     /**
      * Delimiter for entries in {@link #FILTER_SYSPROP}.
@@ -120,26 +152,31 @@ public class BuildOperationTrace implements Stoppable {
     private final String basePath;
 
     private final OutputStream logOutputStream;
-    private final JsonGenerator jsonGenerator = createJsonGenerator();
+    private final ObjectMapper objectMapper;
     private final BuildOperationListenerManager buildOperationListenerManager;
 
     public BuildOperationTrace(StartParameter startParameter, BuildOperationListenerManager buildOperationListenerManager) {
         this.buildOperationListenerManager = buildOperationListenerManager;
 
-        Set<String> filter = getFilter(startParameter);
+        InternalOptions internalOptions = new DefaultInternalOptions(startParameter.getSystemPropertiesArgs());
+        this.basePath = internalOptions.getOption(TRACE_OPTION).get();
+        if (this.basePath == null || basePath.equals(Boolean.FALSE.toString())) {
+            this.logOutputStream = null;
+            this.outputTree = false;
+            this.listener = null;
+            this.objectMapper = null;
+            return;
+        }
+
+        this.objectMapper = createObjectMapper();
+
+        Set<String> filter = getFilter(internalOptions);
         if (filter != null) {
             this.outputTree = false;
             this.listener = new FilteringBuildOperationListener(new SerializingBuildOperationListener(this::write), filter);
         } else {
-            this.outputTree = true;
+            this.outputTree = internalOptions.getOption(TRACE_TREE_OPTION).get();
             this.listener = new SerializingBuildOperationListener(this::write);
-        }
-
-        this.basePath = getProperty(startParameter, SYSPROP);
-
-        if (this.basePath == null || basePath.equals(Boolean.FALSE.toString())) {
-            this.logOutputStream = null;
-            return;
         }
 
         try {
@@ -159,18 +196,9 @@ public class BuildOperationTrace implements Stoppable {
         buildOperationListenerManager.addListener(listener);
     }
 
-    private static String getProperty(StartParameter startParameter, String property) {
-        Map<String, String> sysProps = startParameter.getSystemPropertiesArgs();
-        String basePath = sysProps.get(property);
-        if (basePath == null) {
-            basePath = System.getProperty(property);
-        }
-        return basePath;
-    }
-
     @Nullable
-    private static Set<String> getFilter(StartParameter startParameter) {
-        String filterProperty = getProperty(startParameter, FILTER_SYSPROP);
+    private static Set<String> getFilter(InternalOptions internalOptions) {
+        String filterProperty = internalOptions.getOption(FILTER_OPTION).get();
         if (filterProperty == null) {
             return null;
         }
@@ -199,117 +227,95 @@ public class BuildOperationTrace implements Stoppable {
     }
 
     private void write(SerializedOperation operation) {
-        Thread currentThread = Thread.currentThread();
-        ClassLoader previousClassLoader = currentThread.getContextClassLoader();
-        currentThread.setContextClassLoader(JsonOutput.class.getClassLoader());
         try {
-            String json = jsonGenerator.toJson(operation.toMap());
-            try {
-                synchronized (logOutputStream) {
-                    logOutputStream.write(json.getBytes(StandardCharsets.UTF_8));
-                    logOutputStream.write(NEWLINE);
-                    logOutputStream.flush();
-                }
-            } catch (IOException e) {
-                throw UncheckedException.throwAsUncheckedException(e);
+            String json = objectMapper.writeValueAsString(operation.toMap());
+            synchronized (logOutputStream) {
+                logOutputStream.write(json.getBytes(StandardCharsets.UTF_8));
+                logOutputStream.write(NEWLINE);
+                logOutputStream.flush();
             }
-        } finally {
-            currentThread.setContextClassLoader(previousClassLoader);
+        } catch (IOException e) {
+            throw UncheckedException.throwAsUncheckedException(e);
         }
     }
 
     private void writeDetailTree(List<BuildOperationRecord> roots) throws IOException {
-        try {
-            String rawJson = jsonGenerator.toJson(BuildOperationTree.serialize(roots));
-            String prettyJson = JsonOutput.prettyPrint(rawJson);
-            Files.asCharSink(file(basePath, "-tree.json"), Charsets.UTF_8).write(prettyJson);
-        } catch (OutOfMemoryError e) {
-            System.err.println("Failed to write build operation trace JSON due to out of memory.");
-        }
+        File outputFile = file(basePath, "-tree.json");
+        objectMapper.writerWithDefaultPrettyPrinter()
+            .writeValue(outputFile, BuildOperationTree.serialize(roots));
     }
 
     private void writeSummaryTree(final List<BuildOperationRecord> roots) throws IOException {
-        Files.asCharSink(file(basePath, "-tree.txt"), Charsets.UTF_8).writeLines(new Iterable<String>() {
-            @Override
-            @Nonnull
-            public Iterator<String> iterator() {
+        Path outputPath = Paths.get(basePath + "-tree.txt");
+        try (BufferedWriter writer = Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8)) {
+            Deque<Queue<BuildOperationRecord>> stack = new ArrayDeque<>(Collections.singleton(new ArrayDeque<>(roots)));
+            StringBuilder stringBuilder = new StringBuilder();
 
-                final Deque<Queue<BuildOperationRecord>> stack = new ArrayDeque<>(Collections.singleton(new ArrayDeque<>(roots)));
-                final StringBuilder stringBuilder = new StringBuilder();
+            while (!stack.isEmpty()) {
+                if (stack.peek().isEmpty()) {
+                    stack.pop();
+                    continue;
+                }
 
-                return new Iterator<String>() {
-                    @Override
-                    public boolean hasNext() {
-                        if (stack.isEmpty()) {
-                            return false;
-                        } else if (stack.peek().isEmpty()) {
-                            stack.pop();
-                            return hasNext();
-                        } else {
-                            return true;
-                        }
+                Queue<BuildOperationRecord> children = stack.element();
+                BuildOperationRecord record = children.remove();
+
+                stringBuilder.setLength(0);
+
+                int indents = stack.size() - 1;
+                for (int i = 0; i < indents; ++i) {
+                    stringBuilder.append("  ");
+                }
+
+                if (!record.children.isEmpty()) {
+                    stack.addFirst(new ArrayDeque<>(record.children));
+                }
+
+                stringBuilder.append(record.displayName);
+
+                if (record.details != null) {
+                    stringBuilder.append(" ");
+                    try {
+                        stringBuilder.append(objectMapper.writeValueAsString(record.details));
+                    } catch (JsonProcessingException e) {
+                        throw UncheckedException.throwAsUncheckedException(e);
                     }
+                }
 
-                    @Override
-                    public String next() {
-                        Queue<BuildOperationRecord> children = stack.element();
-                        BuildOperationRecord record = children.remove();
+                if (record.result != null) {
+                    stringBuilder.append(" ");
+                    try {
+                        stringBuilder.append(objectMapper.writeValueAsString(record.result));
+                    } catch (JsonProcessingException e) {
+                        throw UncheckedException.throwAsUncheckedException(e);
+                    }
+                }
 
-                        stringBuilder.setLength(0);
+                stringBuilder.append(" [");
+                stringBuilder.append(record.endTime - record.startTime);
+                stringBuilder.append("ms]");
 
-                        int indents = stack.size() - 1;
+                stringBuilder.append(" (");
+                stringBuilder.append(record.id);
+                stringBuilder.append(")");
 
+                if (!record.progress.isEmpty()) {
+                    for (BuildOperationRecord.Progress progress : record.progress) {
+                        stringBuilder.append(System.lineSeparator());
                         for (int i = 0; i < indents; ++i) {
                             stringBuilder.append("  ");
                         }
-
-                        if (!record.children.isEmpty()) {
-                            stack.addFirst(new ArrayDeque<>(record.children));
-                        }
-
-                        stringBuilder.append(record.displayName);
-
-                        if (record.details != null) {
-                            stringBuilder.append(" ");
-                            stringBuilder.append(jsonGenerator.toJson(record.details));
-                        }
-
-                        if (record.result != null) {
-                            stringBuilder.append(" ");
-                            stringBuilder.append(jsonGenerator.toJson(record.result));
-                        }
-
-                        stringBuilder.append(" [");
-                        stringBuilder.append(record.endTime - record.startTime);
-                        stringBuilder.append("ms]");
-
-                        stringBuilder.append(" (");
-                        stringBuilder.append(record.id);
-                        stringBuilder.append(")");
-
-                        if (!record.progress.isEmpty()) {
-                            for (BuildOperationRecord.Progress progress : record.progress) {
-                                stringBuilder.append(StandardSystemProperty.LINE_SEPARATOR.value());
-                                for (int i = 0; i < indents; ++i) {
-                                    stringBuilder.append("  ");
-                                }
-                                stringBuilder.append("- ")
-                                    .append(progress.details).append(" [")
-                                    .append(progress.time - record.startTime)
-                                    .append("]");
-                            }
-                        }
-
-                        return stringBuilder.toString();
+                        stringBuilder.append("- ")
+                            .append(progress.details).append(" [")
+                            .append(progress.time - record.startTime)
+                            .append("]");
                     }
+                }
 
-                    @Override
-                    public void remove() {
-                        throw new UnsupportedOperationException();
-                    }
-                };
+                writer.write(stringBuilder.toString());
+                writer.newLine();
             }
-        });
+        }
     }
 
     public static BuildOperationTree read(String basePath) {
@@ -334,7 +340,7 @@ public class BuildOperationTrace implements Stoppable {
 
     private static List<BuildOperationRecord> readLogToTreeRoots(final File logFile, boolean completeTree) {
         try {
-            final JsonSlurper slurper = new JsonSlurper();
+            final ObjectMapper objectMapper = new ObjectMapper();
 
             final List<BuildOperationRecord> roots = new ArrayList<>();
             final Map<Object, PendingOperation> pendings = new HashMap<>();
@@ -342,10 +348,15 @@ public class BuildOperationTrace implements Stoppable {
 
             final List<SerializedOperationProgress> danglingProgress = new ArrayList<>();
 
-            Files.asCharSource(logFile, Charsets.UTF_8).readLines(new LineProcessor<Void>() {
-                @Override
-                public boolean processLine(@SuppressWarnings("NullableProblems") String line) {
-                    Map<String, ?> map = uncheckedNonnullCast(slurper.parseText(line));
+            try (Stream<String> lines = Files.lines(logFile.toPath())) {
+                lines.forEach(line -> {
+                    Map<String, ?> map;
+                    try {
+                        map = objectMapper.readValue(line, new TypeReference<Map<String, Object>>() {});
+                    } catch (JsonProcessingException e) {
+                        throw UncheckedException.throwAsUncheckedException(e);
+                    }
+
                     if (map.containsKey("startTime")) {
                         SerializedOperationStart serialized = new SerializedOperationStart(map);
                         pendings.put(serialized.id, new PendingOperation(serialized));
@@ -387,7 +398,7 @@ public class BuildOperationTrace implements Stoppable {
                             resultMap == null ? null : Collections.unmodifiableMap(resultMap),
                             finish.resultClassName,
                             finish.failureMsg,
-                            convertProgressEvents(pending.progress),
+                            pending.progress,
                             BuildOperationRecord.ORDERING.immutableSortedCopy(children)
                         );
 
@@ -408,15 +419,8 @@ public class BuildOperationTrace implements Stoppable {
                             }
                         }
                     }
-
-                    return true;
-                }
-
-                @Override
-                public Void getResult() {
-                    return null;
-                }
-            });
+                });
+            }
 
             assert pendings.isEmpty();
 
@@ -426,8 +430,8 @@ public class BuildOperationTrace implements Stoppable {
                 roots.add(new BuildOperationRecord(
                     -1L, null,
                     "Dangling pending operations",
-                    0, 0, null, null, null, null, null,
-                    convertProgressEvents(danglingProgress),
+                    0L, 0L, null, null, null, null, null,
+                    danglingProgress,
                     Collections.emptyList()
                 ));
             }
@@ -439,24 +443,11 @@ public class BuildOperationTrace implements Stoppable {
 
     }
 
-    private static List<BuildOperationRecord.Progress> convertProgressEvents(List<SerializedOperationProgress> toConvert) {
-        List<BuildOperationRecord.Progress> progresses = new ArrayList<>();
-        for (SerializedOperationProgress progress : toConvert) {
-            Map<String, ?> progressDetailsMap = uncheckedCast(progress.details);
-            progresses.add(new BuildOperationRecord.Progress(
-                progress.time,
-                progressDetailsMap,
-                progress.detailsClassName
-            ));
-        }
-        return progresses;
-    }
-
     private static File logFile(String basePath) {
         return file(basePath, "-log.txt");
     }
 
-    private static File file(String base, String suffix) {
+    private static File file(@Nullable String base, String suffix) {
         return new File((base == null || base.trim().isEmpty() ? "operations" : base) + suffix).getAbsoluteFile();
     }
 
@@ -472,7 +463,7 @@ public class BuildOperationTrace implements Stoppable {
 
     }
 
-    public static Object toSerializableModel(Object object) {
+    public static @Nullable Object toSerializableModel(@Nullable Object object) {
         if (object instanceof CustomOperationTraceSerialization) {
             return ((CustomOperationTraceSerialization) object).getCustomOperationTraceSerializableModel();
         } else {
@@ -480,44 +471,80 @@ public class BuildOperationTrace implements Stoppable {
         }
     }
 
-    @NonNullApi
-    private static class JsonClassConverter implements JsonGenerator.Converter {
+    @SuppressWarnings("rawtypes")
+    private static class JsonClassSerializer extends JsonSerializer<Class> {
         @Override
-        public boolean handles(Class<?> type) {
-            return Class.class.equals(type);
-        }
-
-        @Override
-        public Object convert(Object value, String key) {
-            Class<?> clazz = (Class<?>) value;
-            return clazz.getName();
+        public void serialize(Class aClass, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException {
+            jsonGenerator.writeString(aClass.getName());
         }
     }
 
-    private static JsonGenerator createJsonGenerator() {
-        return new JsonGenerator.Options()
-            .addConverter(new JsonClassConverter())
-            .addConverter(new JsonThrowableConverter())
-            .build();
+    private static ObjectMapper createObjectMapper() {
+        return new ObjectMapper()
+            .registerModule(new SimpleModule()
+                .addSerializer(Class.class, new JsonClassSerializer())
+                .addSerializer(Throwable.class, new JsonThrowableSerializer())
+                .addSerializer(AttributeContainer.class, new JsonAttributeContainerSerializer())
+                .setSerializerModifier(new SkipDeprecatedBeanSerializerModifier())
+            )
+            .registerModule(new JavaTimeModule())
+            .registerModule(new Jdk8Module())
+            .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
     }
 
-    @NonNullApi
-    private static class JsonThrowableConverter implements JsonGenerator.Converter {
+    private static class JsonThrowableSerializer extends JsonSerializer<Throwable> {
         @Override
-        public boolean handles(Class<?> type) {
-            return Throwable.class.isAssignableFrom(type);
-        }
-
-        @Override
-        public Object convert(Object value, String key) {
-            Throwable throwable = (Throwable) value;
+        public void serialize(Throwable throwable, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartObject();
             String message = throwable.getMessage();
-            ImmutableMap.Builder<Object, Object> builder = ImmutableMap.builder();
             if (message != null) {
-                builder.put("message", message);
+                gen.writeStringField("message", message);
             }
-            builder.put("stackTrace", Throwables.getStackTraceAsString(throwable));
-            return builder.build();
+            gen.writeStringField("stackTrace", Throwables.getStackTraceAsString(throwable));
+            gen.writeEndObject();
+        }
+    }
+
+    /**
+     * A custom serializer is needed to deal with the fact that our {@link AttributeContainer} implementations
+     * have {@link AttributeContainer#getAttributes()} methods that return {@code this}.
+     *
+     * Attempting to serialize any of these causes a stack overflow, so
+     * just convert them to an easily serializable {@link Map} first.
+     */
+    private static class JsonAttributeContainerSerializer extends JsonSerializer<AttributeContainer> {
+        @Override
+        public void serialize(AttributeContainer attributeContainer, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            /*
+             * We need to convert to a map manually since asMap is only available on the internal container type,
+             * which even though we know should always be a safe cast, it isn't a type that is available in this project.
+             */
+            ImmutableMap.Builder<Attribute<?>, ?> builder = ImmutableMap.builder();
+            for (Attribute<?> attribute : attributeContainer.keySet()) {
+                builder.put(attribute, Cast.uncheckedCast(Objects.requireNonNull(attributeContainer.getAttribute(attribute))));
+            }
+            serializers.defaultSerializeValue(builder.build(), gen);
+        }
+    }
+
+    /**
+     * Avoid serializing any deprecated properties, since they either trigger deprecation warnings
+     * unnecessarily, or they might trigger some workaround behavior we otherwise want to avoid.
+     */
+    private static class SkipDeprecatedBeanSerializerModifier extends BeanSerializerModifier {
+        @Override
+        public List<BeanPropertyWriter> changeProperties(
+            SerializationConfig config,
+            BeanDescription beanDesc,
+            List<BeanPropertyWriter> beanProperties
+        ) {
+            // Remove any property where the member (field or getter) is annotated with @Deprecated
+            beanProperties.removeIf(writer -> {
+                AnnotatedMember member = writer.getMember();
+                return member != null && member.hasAnnotation(Deprecated.class);
+            });
+
+            return beanProperties;
         }
     }
 

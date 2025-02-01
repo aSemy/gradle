@@ -30,6 +30,8 @@ dependencies {
     api(projects.messaging)
     api(projects.modelCore)
     api(projects.native)
+    api(projects.persistentCache)
+    api(projects.problemsApi)
     api(projects.processMemoryServices)
     api(projects.serialization)
     api(projects.serviceLookup)
@@ -49,7 +51,6 @@ dependencies {
     implementation(projects.enterpriseOperations)
     implementation(projects.functional)
     implementation(projects.io)
-    implementation(projects.problemsApi)
     implementation(projects.serviceRegistryBuilder)
 
     implementation(libs.slf4jApi)
@@ -68,6 +69,7 @@ dependencies {
     testImplementation(projects.internalIntegTesting)
     testImplementation(testFixtures(projects.serialization))
     testImplementation(testFixtures(projects.core))
+    testImplementation(testFixtures(projects.time))
     testImplementation(testFixtures(projects.logging))
     testImplementation(testFixtures(projects.toolingApi))
     testImplementation(testFixtures(projects.daemonProtocol))
@@ -78,6 +80,7 @@ dependencies {
     integTestImplementation(libs.commonsLang)
     integTestImplementation(libs.commonsIo)
     integTestImplementation(testFixtures(projects.buildConfiguration))
+    integTestImplementation(testFixtures(projects.toolchainsJvmShared))
 
     integTestDistributionRuntimeOnly(projects.distributionsFull) {
         because("built-in options are required to be present at runtime for 'TaskOptionsSpec'")

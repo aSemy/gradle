@@ -30,6 +30,7 @@ import org.gradle.api.file.FileTree;
 import org.gradle.api.file.FileTreeElement;
 import org.gradle.api.internal.DocumentationRegistry;
 import org.gradle.api.internal.classpath.ModuleRegistry;
+import org.gradle.api.internal.provider.PropertyFactory;
 import org.gradle.api.internal.tasks.testing.JvmTestExecutionSpec;
 import org.gradle.api.internal.tasks.testing.TestExecutableUtils;
 import org.gradle.api.internal.tasks.testing.TestExecuter;
@@ -111,7 +112,7 @@ import static org.gradle.util.internal.ConfigureUtil.configureUsing;
  *
  * <pre class='autoTested'>
  * plugins {
- *     id 'java' // adds 'test' task
+ *     id("java-library") // adds 'test' task
  * }
  *
  * test {
@@ -139,7 +140,7 @@ import static org.gradle.util.internal.ConfigureUtil.configureUsing;
  *   maxHeapSize = "512m"
  *
  *   // set JVM arguments for the test JVM(s)
- *   jvmArgs '-XX:MaxPermSize=256m'
+ *   jvmArgs('-XX:MaxPermSize=256m')
  *
  *   // listen to events in the test execution lifecycle
  *   beforeTest { descriptor -&gt;
@@ -205,26 +206,13 @@ public abstract class Test extends AbstractTestTask implements JavaForkOptions, 
     }
 
     private Provider<JavaLauncher> createJavaLauncherConvention() {
-        final ObjectFactory objectFactory = getObjectFactory();
         final JavaToolchainService javaToolchainService = getJavaToolchainService();
-        Provider<JavaToolchainSpec> executableOverrideToolchainSpec = getProviderFactory().provider(new Callable<JavaToolchainSpec>() {
-            @Override
-            public JavaToolchainSpec call() {
-                return TestExecutableUtils.getExecutableToolchainSpec(Test.this, objectFactory);
-            }
-        });
+        PropertyFactory propertyFactory = getPropertyFactory();
+        Provider<JavaToolchainSpec> executableOverrideToolchainSpec = getProviderFactory().provider(() -> TestExecutableUtils.getExecutableToolchainSpec(Test.this, propertyFactory));
 
         return executableOverrideToolchainSpec
-            .flatMap(new Transformer<Provider<JavaLauncher>, JavaToolchainSpec>() {
-                @Override
-                public Provider<JavaLauncher> transform(JavaToolchainSpec spec) {
-                    return javaToolchainService.launcherFor(spec);
-                }
-            })
-            .orElse(javaToolchainService.launcherFor(new Action<JavaToolchainSpec>() {
-                @Override
-                public void execute(JavaToolchainSpec javaToolchainSpec) {}
-            }));
+            .flatMap((Transformer<Provider<JavaLauncher>, JavaToolchainSpec>) javaToolchainService::launcherFor)
+            .orElse(javaToolchainService.launcherFor(javaToolchainSpec -> {}));
     }
 
     /**
@@ -671,6 +659,7 @@ public abstract class Test extends AbstractTestTask implements JavaForkOptions, 
         validateExecutableMatchesToolchain();
         JavaForkOptions javaForkOptions = getForkOptionsFactory().newJavaForkOptions();
         copyTo(javaForkOptions);
+        javaForkOptions.systemProperty(TestWorker.WORKER_TMPDIR_SYS_PROPERTY, new File(getTemporaryDir(), "work"));
         JavaModuleDetector javaModuleDetector = getJavaModuleDetector();
         boolean testIsModule = javaModuleDetector.isModule(modularity.getInferModulePath().get(), getTestClassesDirs());
         FileCollection classpath = javaModuleDetector.inferClasspath(testIsModule, stableClasspath);
@@ -725,12 +714,11 @@ public abstract class Test extends AbstractTestTask implements JavaForkOptions, 
         if (getDebug()) {
             getLogger().info("Running tests for remote debugging.");
         }
-        forkOptions.systemProperty(TestWorker.WORKER_TMPDIR_SYS_PROPERTY, new File(getTemporaryDir(), "work"));
 
         try {
             super.executeTests();
         } finally {
-            CompositeStoppable.stoppable(getTestFramework());
+            CompositeStoppable.stoppable(getTestFramework()).stop();
         }
     }
 
@@ -1330,6 +1318,11 @@ public abstract class Test extends AbstractTestTask implements JavaForkOptions, 
 
     @Inject
     protected ObjectFactory getObjectFactory() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Inject
+    protected PropertyFactory getPropertyFactory() {
         throw new UnsupportedOperationException();
     }
 

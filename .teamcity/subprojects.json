@@ -28,6 +28,13 @@
     "crossVersionTests": false
   },
   {
+    "name": "base-diagnostics",
+    "path": "platforms/core-configuration/base-diagnostics",
+    "unitTests": true,
+    "functionalTests": true,
+    "crossVersionTests": false
+  },
+  {
     "name": "base-ide-plugins",
     "path": "platforms/ide/base-ide-plugins",
     "unitTests": true,
@@ -126,6 +133,20 @@
     "crossVersionTests": false
   },
   {
+    "name": "build-init-specs",
+    "path": "platforms/software/build-init-specs",
+    "unitTests": true,
+    "functionalTests": false,
+    "crossVersionTests": false
+  },
+  {
+    "name": "build-init-specs-api",
+    "path": "platforms/software/build-init-specs-api",
+    "unitTests": false,
+    "functionalTests": false,
+    "crossVersionTests": false
+  },
+  {
     "name": "build-operations",
     "path": "platforms/core-runtime/build-operations",
     "unitTests": true,
@@ -219,7 +240,7 @@
   {
     "name": "configuration-problems-base",
     "path": "platforms/core-configuration/configuration-problems-base",
-    "unitTests": false,
+    "unitTests": true,
     "functionalTests": false,
     "crossVersionTests": false
   },
@@ -308,6 +329,13 @@
     "crossVersionTests": false
   },
   {
+    "name": "declarative-dsl-internal-utils",
+    "path": "platforms/core-configuration/declarative-dsl-internal-utils",
+    "unitTests": true,
+    "functionalTests": false,
+    "crossVersionTests": false
+  },
+  {
     "name": "declarative-dsl-provider",
     "path": "platforms/core-configuration/declarative-dsl-provider",
     "unitTests": true,
@@ -340,13 +368,6 @@
     "path": "platforms/core-configuration/dependency-management-serialization-codecs",
     "unitTests": false,
     "functionalTests": false,
-    "crossVersionTests": false
-  },
-  {
-    "name": "diagnostics",
-    "path": "subprojects/diagnostics",
-    "unitTests": true,
-    "functionalTests": true,
     "crossVersionTests": false
   },
   {
@@ -494,6 +515,13 @@
     "path": "platforms/core-configuration/file-collections",
     "unitTests": true,
     "functionalTests": true,
+    "crossVersionTests": false
+  },
+  {
+    "name": "file-operations",
+    "path": "platforms/core-configuration/file-operations",
+    "unitTests": false,
+    "functionalTests": false,
     "crossVersionTests": false
   },
   {
@@ -653,7 +681,7 @@
   {
     "name": "internal-instrumentation-api",
     "path": "platforms/core-runtime/internal-instrumentation-api",
-    "unitTests": false,
+    "unitTests": true,
     "functionalTests": false,
     "crossVersionTests": false
   },
@@ -1183,6 +1211,13 @@
     "crossVersionTests": false
   },
   {
+    "name": "software-diagnostics",
+    "path": "platforms/software/software-diagnostics",
+    "unitTests": true,
+    "functionalTests": true,
+    "crossVersionTests": false
+  },
+  {
     "name": "stdlib-java-extensions",
     "path": "platforms/core-runtime/stdlib-java-extensions",
     "unitTests": true,
@@ -1320,6 +1355,13 @@
     "path": "platforms/software/version-control",
     "unitTests": true,
     "functionalTests": true,
+    "crossVersionTests": false
+  },
+  {
+    "name": "versioned-cache",
+    "path": "platforms/core-runtime/versioned-cache",
+    "unitTests": true,
+    "functionalTests": false,
     "crossVersionTests": false
   },
   {

@@ -26,6 +26,7 @@ import org.gradle.execution.ExecutionAccessChecker
 import org.gradle.execution.ExecutionAccessListener
 import org.gradle.internal.buildoption.InternalOptions
 import org.gradle.internal.buildtree.BuildModelParameters
+import org.gradle.internal.buildtree.BuildTreeModelControllerServices
 import org.gradle.internal.cc.impl.initialization.ConfigurationCacheStartParameter
 import org.gradle.internal.cc.impl.problems.BuildNameProvider
 import org.gradle.internal.cc.impl.services.DefaultIsolatedProjectEvaluationListenerProvider
@@ -52,7 +53,9 @@ class ConfigurationCacheServices : AbstractGradleModuleServices() {
 
     override fun registerBuildSessionServices(registration: ServiceRegistration) {
         registration.run {
-            add(DefaultBuildTreeModelControllerServices::class.java)
+            add(BuildTreeModelControllerServices::class.java, DefaultBuildTreeModelControllerServices::class.java)
+            add(ConfigurationCacheRepository::class.java)
+            add(ConfigurationCacheEntryCollector::class.java)
         }
     }
 
@@ -60,7 +63,6 @@ class ConfigurationCacheServices : AbstractGradleModuleServices() {
         registration.run {
             add(BuildNameProvider::class.java)
             add(ConfigurationCacheKey::class.java)
-            add(ConfigurationCacheRepository::class.java)
             add(DefaultBuildModelControllerServices::class.java)
             add(DefaultBuildToolingModelControllerFactory::class.java)
             add(DeprecatedFeaturesListener::class.java)
@@ -79,8 +81,8 @@ class ConfigurationCacheServices : AbstractGradleModuleServices() {
         registration.run {
             add(RelevantProjectsRegistry::class.java)
             addProvider(TaskExecutionAccessCheckerProvider)
-            add(DefaultConfigurationCacheHost::class.java)
-            add(DefaultConfigurationCacheIO::class.java)
+            add(ConfigurationCacheHost::class.java, DefaultConfigurationCacheHost::class.java)
+            add(ConfigurationCacheBuildTreeIO::class.java, ConfigurationCacheIncludedBuildIO::class.java, DefaultConfigurationCacheIO::class.java)
             add(
                 IsolatedProjectEvaluationListenerProvider::class.java,
                 GradleLifecycleActionExecutor::class.java,

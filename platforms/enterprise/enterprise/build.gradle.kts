@@ -11,24 +11,23 @@ errorprone {
 }
 
 dependencies {
-    api(projects.buildOperations)
     api(projects.baseServices)
+    api(projects.buildOperations)
     api(projects.configurationCache)
     api(projects.core)
     api(projects.coreApi)
     api(projects.daemonServices)
     api(projects.enterpriseLogging)
     api(projects.fileCollections)
-    api(projects.stdlibJavaExtensions)
     api(projects.jvmServices)
     api(projects.launcher)
     api(projects.modelCore)
     api(projects.serviceLookup)
     api(projects.serviceProvider)
     api(projects.snapshots)
+    api(projects.stdlibJavaExtensions)
     api(projects.testingJvm)
     api(projects.time)
-    api(projects.problemsApi)
 
     api(libs.inject)
     api(libs.jsr305)
@@ -38,7 +37,6 @@ dependencies {
     implementation(projects.files)
     implementation(projects.hashing)
     implementation(projects.logging)
-    implementation(projects.processServices)
     implementation(projects.serialization)
     implementation(projects.testingBase)
 
@@ -49,6 +47,7 @@ dependencies {
     }
 
     testImplementation(projects.resources)
+    testImplementation(testFixtures(projects.core))
 
     integTestImplementation(projects.internalTesting)
     integTestImplementation(projects.internalIntegTesting)

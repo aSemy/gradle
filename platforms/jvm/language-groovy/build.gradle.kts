@@ -1,16 +1,8 @@
 plugins {
     id("gradlebuild.distribution.api-java")
-    id("gradlebuild.instrumented-java-project")
 }
 
 description = "Adds support for building Groovy projects"
-
-errorprone {
-    disabledChecks.addAll(
-        "ModifyCollectionInEnhancedForLoop", // 1 occurrences
-        "UnusedMethod", // 4 occurrences
-    )
-}
 
 dependencies {
     api(projects.serviceProvider)
@@ -19,6 +11,7 @@ dependencies {
     api(projects.coreApi)
     api(projects.core)
     api(projects.files)
+    api(projects.fileOperations)
     api(projects.fileTemp)
     api(projects.jvmServices)
     api(projects.languageJava)

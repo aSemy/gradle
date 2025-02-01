@@ -31,6 +31,8 @@ import gradlebuild.basics.BuildParams.BUILD_VCS_NUMBER
 import gradlebuild.basics.BuildParams.BUILD_VERSION_QUALIFIER
 import gradlebuild.basics.BuildParams.BUNDLE_GROOVY_4
 import gradlebuild.basics.BuildParams.CI_ENVIRONMENT_VARIABLE
+import gradlebuild.basics.BuildParams.DEBUG_DAEMON
+import gradlebuild.basics.BuildParams.DEBUG_LAUNCHER
 import gradlebuild.basics.BuildParams.DEFAULT_PERFORMANCE_BASELINES
 import gradlebuild.basics.BuildParams.ENABLE_CONFIGURATION_CACHE_FOR_DOCS_TESTS
 import gradlebuild.basics.BuildParams.FLAKY_TEST
@@ -40,6 +42,7 @@ import gradlebuild.basics.BuildParams.MAX_PARALLEL_FORKS
 import gradlebuild.basics.BuildParams.MAX_TEST_DISTRIBUTION_LOCAL_EXECUTORS
 import gradlebuild.basics.BuildParams.MAX_TEST_DISTRIBUTION_REMOTE_EXECUTORS
 import gradlebuild.basics.BuildParams.PERFORMANCE_BASELINES
+import gradlebuild.basics.BuildParams.PERFORMANCE_CHANNEL_ENV
 import gradlebuild.basics.BuildParams.PERFORMANCE_DB_PASSWORD
 import gradlebuild.basics.BuildParams.PERFORMANCE_DB_PASSWORD_ENV
 import gradlebuild.basics.BuildParams.PERFORMANCE_DB_URL
@@ -66,6 +69,7 @@ import gradlebuild.basics.BuildParams.VENDOR_MAPPING
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider
+import org.gradle.internal.os.OperatingSystem
 import org.gradle.jvm.toolchain.JvmVendorSpec
 import org.gradle.jvm.toolchain.internal.LocationListInstallationSupplier.JAVA_INSTALLATIONS_PATHS_PROPERTY
 import org.jetbrains.kotlin.util.capitalizeDecapitalize.toUpperCaseAsciiOnly
@@ -112,6 +116,7 @@ object BuildParams {
     const val PERFORMANCE_TEST_VERBOSE = "performanceTest.verbose"
     const val PERFORMANCE_DB_PASSWORD = "org.gradle.performance.db.password"
     const val PERFORMANCE_DB_PASSWORD_ENV = "PERFORMANCE_DB_PASSWORD_TCAGENT"
+    const val PERFORMANCE_CHANNEL_ENV = "PERFORMANCE_CHANNEL"
     const val PERFORMANCE_DB_URL = "org.gradle.performance.db.url"
     const val PERFORMANCE_DB_USERNAME = "org.gradle.performance.db.username"
     const val PERFORMANCE_DEPENDENCY_BUILD_IDS = "org.gradle.performance.dependencyBuildIds"
@@ -132,6 +137,8 @@ object BuildParams {
     const val RUN_ANDROID_STUDIO_IN_HEADLESS_MODE = "runAndroidStudioInHeadlessMode"
     const val STUDIO_HOME = "studioHome"
     const val BUNDLE_GROOVY_4 = "bundleGroovy4"
+    const val DEBUG_DAEMON = "debugDaemon"
+    const val DEBUG_LAUNCHER = "debugLauncher"
 
     /**
      * Run docs tests with the configuration cache enabled.
@@ -261,8 +268,8 @@ val Project.maxTestDistributionRemoteExecutors: Int?
 val Project.maxTestDistributionLocalExecutors: Int?
     get() = gradleProperty(MAX_TEST_DISTRIBUTION_LOCAL_EXECUTORS).orNull?.toInt()
 
-val Project.toolchainInstallationPaths: String?
-    get() = gradleProperty(JAVA_INSTALLATIONS_PATHS_PROPERTY).orNull
+val Project.toolchainInstallationPaths: Provider<String>
+    get() = gradleProperty(JAVA_INSTALLATIONS_PATHS_PROPERTY)
 
 val Project.flakyTestStrategy: FlakyTestStrategy
     get() = gradleProperty(FLAKY_TEST).let {
@@ -285,6 +292,11 @@ val Project.performanceDependencyBuildIds: Provider<String>
 val Project.performanceBaselines: String?
     get() = stringPropertyOrNull(PERFORMANCE_BASELINES)
 
+val Project.performanceChannel: Provider<String>
+    get() = environmentVariable(PERFORMANCE_CHANNEL_ENV).orElse(provider {
+        val channelSuffix = if (OperatingSystem.current().isLinux) "" else "-${OperatingSystem.current().familyName.lowercase()}"
+        "commits$channelSuffix-${buildBranch.get()}"
+     })
 
 val Project.performanceDbPassword: Provider<String>
     get() = environmentVariable(PERFORMANCE_DB_PASSWORD_ENV)
@@ -356,10 +368,7 @@ val Project.predictiveTestSelectionEnabled: Provider<Boolean>
         .map { it.toBoolean() }
         .orElse(
             buildBranch.zip(buildRunningOnCi) { branch, ci ->
-                val protectedBranches = listOf("master", "release")
-                ci && !protectedBranches.contains(branch)
-                    && !branch.startsWith("pre-test/")
-                    && !branch.startsWith("gh-readonly-queue/")
+                ci && !listOf("master", "release", "gh-readonly-queue/").any { branch.startsWith(it) }
             }
         ).zip(project.rerunAllTests) { enabled, rerunAllTests ->
             enabled && !rerunAllTests
@@ -428,3 +437,9 @@ val Project.isPromotionBuild: Boolean
  */
 val Project.isBundleGroovy4: Boolean
     get() = systemProperty(BUNDLE_GROOVY_4).orNull.toBoolean()
+
+val Project.daemonDebuggingIsEnabled: Boolean
+    get() = propertyFromAnySource(DEBUG_DAEMON).isPresent
+
+val Project.launcherDebuggingIsEnabled: Boolean
+    get() = propertyFromAnySource(DEBUG_LAUNCHER).isPresent

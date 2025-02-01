@@ -1,9 +1,12 @@
 plugins {
     id("gradlebuild.distribution.api-java")
-    id("gradlebuild.instrumented-java-project")
 }
 
 description = "Source for JavaCompile, JavaExec and Javadoc tasks, it also contains logic for incremental Java compilation"
+
+gradlebuildJava {
+    usesJdkInternals = true
+}
 
 errorprone {
     disabledChecks.addAll(
@@ -13,7 +16,6 @@ errorprone {
         "InvalidInlineTag", // 3 occurrences
         "MissingCasesInEnumSwitch", // 1 occurrences
         "MixedMutabilityReturnType", // 3 occurrences
-        "OperatorPrecedence", // 2 occurrences
     )
 }
 
@@ -28,9 +30,11 @@ dependencies {
     api(projects.coreApi)
     api(projects.dependencyManagement)
     api(projects.fileCollections)
+    api(projects.fileOperations)
     api(projects.files)
     api(projects.hashing)
     api(projects.languageJvm)
+    api(projects.modelCore)
     api(projects.persistentCache)
     api(projects.platformBase)
     api(projects.platformJvm)
@@ -58,7 +62,8 @@ dependencies {
     implementation(projects.jvmServices)
     implementation(projects.logging)
     implementation(projects.loggingApi)
-    implementation(projects.modelCore)
+    implementation(projects.logging)
+    implementation(projects.problemsRendering)
     implementation(projects.toolingApi)
 
     api(libs.slf4jApi)
@@ -69,9 +74,11 @@ dependencies {
     runtimeOnly(projects.javaCompilerPlugin)
 
     testImplementation(projects.baseServicesGroovy)
+    testImplementation(projects.native)
     testImplementation(testFixtures(projects.core))
     testImplementation(testFixtures(projects.platformBase))
     testImplementation(testFixtures(projects.toolchainsJvm))
+    testImplementation(testFixtures(projects.toolchainsJvmShared))
 
     testImplementation(libs.commonsIo)
     testImplementation(libs.nativePlatform) {
@@ -107,12 +114,6 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-tasks.withType<JavaCompile>().configureEach {
-    options.release = null
-    sourceCompatibility = "8"
-    targetCompatibility = "8"
-}
-
 strictCompile {
     ignoreDeprecations() // this project currently uses many deprecated part from 'platform-jvm'
 }
@@ -126,15 +127,14 @@ packageCycles {
 integTest.usesJavadocCodeSnippets = true
 
 tasks.javadoc {
-    // This project accesses JDK internals.
-    // We would ideally add --add-exports flags for the required packages, however
-    // due to limitations in the javadoc modeling API, we cannot specify multiple
-    // flags for the same key.
-    // Instead, we disable failure on javadoc errors.
-    isFailOnError = false
     options {
         this as StandardJavadocDocletOptions
-        addBooleanOption("quiet", true)
+        // This project accesses JDK internals, which we need to open up so that javadoc can access them
+        addMultilineStringsOption("-add-exports").value = listOf(
+            "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
+            "jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+            "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED"
+        )
     }
 }
 tasks.isolatedProjectsIntegTest {

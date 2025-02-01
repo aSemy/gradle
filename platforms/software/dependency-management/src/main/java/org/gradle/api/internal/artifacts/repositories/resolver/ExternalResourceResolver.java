@@ -24,6 +24,7 @@ import org.gradle.api.artifacts.ComponentMetadataSupplierDetails;
 import org.gradle.api.artifacts.ModuleIdentifier;
 import org.gradle.api.artifacts.component.ComponentArtifactIdentifier;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
+import org.gradle.api.artifacts.component.ModuleComponentSelector;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ComponentResolvers;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ConfiguredModuleComponentRepository;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ModuleComponentRepositoryAccess;
@@ -39,7 +40,6 @@ import org.gradle.internal.component.external.model.DefaultModuleComponentArtifa
 import org.gradle.internal.component.external.model.ModuleComponentArtifactIdentifier;
 import org.gradle.internal.component.external.model.ModuleComponentArtifactMetadata;
 import org.gradle.internal.component.external.model.ModuleComponentResolveMetadata;
-import org.gradle.internal.component.external.model.ModuleDependencyMetadata;
 import org.gradle.internal.component.external.model.MutableModuleComponentResolveMetadata;
 import org.gradle.internal.component.model.ComponentArtifactMetadata;
 import org.gradle.internal.component.model.ComponentArtifactResolveMetadata;
@@ -186,8 +186,8 @@ public abstract class ExternalResourceResolver implements ConfiguredModuleCompon
         throw new UnsupportedOperationException();
     }
 
-    private void doListModuleVersions(ModuleDependencyMetadata dependency, BuildableModuleVersionListingResolveResult result) {
-        ModuleIdentifier module = dependency.getSelector().getModuleIdentifier();
+    private void doListModuleVersions(ModuleComponentSelector selector, ComponentOverrideMetadata overrideMetadata, BuildableModuleVersionListingResolveResult result) {
+        ModuleIdentifier module = selector.getModuleIdentifier();
 
         tryListingViaRule(module, result);
 
@@ -203,7 +203,7 @@ public abstract class ExternalResourceResolver implements ConfiguredModuleCompon
 
         // Iterate over the metadata sources to see if they can provide the version list
         for (MetadataSource<?> metadataSource : metadataSources.sources()) {
-            metadataSource.listModuleVersions(dependency, module, completeIvyPatterns, completeArtifactPatterns, versionLister, result);
+            metadataSource.listModuleVersions(selector, overrideMetadata, completeIvyPatterns, completeArtifactPatterns, versionLister, result);
             if (result.hasResult() && result.isAuthoritative()) {
                 return;
             }
@@ -312,17 +312,17 @@ public abstract class ExternalResourceResolver implements ConfiguredModuleCompon
     }
 
     private void publishChecksums(ExternalResourceName destination, File content) {
-        publishChecksum(destination, content, "sha1", 40);
+        publishChecksum(destination, content, "sha1");
 
         if (!ExternalResourceResolver.disableExtraChecksums()) {
-            publishPossiblyUnsupportedChecksum(destination, content, "sha-256", 64);
-            publishPossiblyUnsupportedChecksum(destination, content, "sha-512", 128);
+            publishPossiblyUnsupportedChecksum(destination, content, "sha-256");
+            publishPossiblyUnsupportedChecksum(destination, content, "sha-512");
         }
     }
 
-    private void publishPossiblyUnsupportedChecksum(ExternalResourceName destination, File content, String algorithm, int length) {
+    private void publishPossiblyUnsupportedChecksum(ExternalResourceName destination, File content, String algorithm) {
         try {
-            publishChecksum(destination, content, algorithm, length);
+            publishChecksum(destination, content, algorithm);
         } catch (Exception ex) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.warn("Cannot upload checksum for " + content.getName() + " because the remote repository doesn't support " + algorithm + ". This will not fail the build.", ex);
@@ -332,13 +332,13 @@ public abstract class ExternalResourceResolver implements ConfiguredModuleCompon
         }
     }
 
-    private void publishChecksum(ExternalResourceName destination, File content, String algorithm, int length) {
-        byte[] checksum = createChecksumFile(content, algorithm.toUpperCase(Locale.ROOT), length);
+    private void publishChecksum(ExternalResourceName destination, File content, String algorithm) {
+        byte[] checksum = createChecksumFile(content, algorithm.toUpperCase(Locale.ROOT));
         ExternalResourceName checksumDestination = destination.append("." + algorithm.replaceAll("-", ""));
         repository.resource(checksumDestination).put(new ByteArrayReadableContent(checksum));
     }
 
-    private byte[] createChecksumFile(File src, String algorithm, int checksumLength) {
+    private byte[] createChecksumFile(File src, String algorithm) {
         HashCode hash = checksumService.hash(src, algorithm);
         String formattedHashString = hash.toString();
         try {
@@ -382,7 +382,7 @@ public abstract class ExternalResourceResolver implements ConfiguredModuleCompon
         }
 
         @Override
-        public final void listModuleVersions(ModuleDependencyMetadata dependency, BuildableModuleVersionListingResolveResult result) {
+        public final void listModuleVersions(ModuleComponentSelector selector, ComponentOverrideMetadata overrideMetadata, BuildableModuleVersionListingResolveResult result) {
         }
 
         @Override
@@ -418,8 +418,8 @@ public abstract class ExternalResourceResolver implements ConfiguredModuleCompon
         }
 
         @Override
-        public final void listModuleVersions(ModuleDependencyMetadata dependency, BuildableModuleVersionListingResolveResult result) {
-            doListModuleVersions(dependency, result);
+        public final void listModuleVersions(ModuleComponentSelector selector, ComponentOverrideMetadata overrideMetadata, BuildableModuleVersionListingResolveResult result) {
+            doListModuleVersions(selector, overrideMetadata, result);
         }
 
         @Override

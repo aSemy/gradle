@@ -1,6 +1,5 @@
 plugins {
     id("gradlebuild.distribution.api-java")
-    id("gradlebuild.instrumented-java-project")
 }
 
 description = "Public and internal 'core' Gradle APIs with implementation"
@@ -53,7 +52,6 @@ errorprone {
         "NonApiType", // 1 occurrences
         "NonCanonicalType", // 16 occurrences
         "NotJavadoc", // 1 occurrences
-        "OperatorPrecedence", // 5 occurrences
         "OptionalMapUnusedValue", // 1 occurrences
         "ProtectedMembersInFinalClass", // 1 occurrences
         "ReferenceEquality", // 2 occurrences
@@ -85,6 +83,7 @@ dependencies {
     api(projects.buildCacheLocal)
     api(projects.buildCachePackaging)
     api(projects.buildCacheSpi)
+    api(projects.buildInitSpecs)
     api(projects.buildOperations)
     api(projects.buildOption)
     api(projects.cli)
@@ -94,6 +93,7 @@ dependencies {
     api(projects.enterpriseOperations)
     api(projects.execution)
     api(projects.fileCollections)
+    api(projects.fileOperations)
     api(projects.fileTemp)
     api(projects.fileWatching)
     api(projects.files)
@@ -113,6 +113,7 @@ dependencies {
     api(projects.processServices)
     api(projects.resources)
     api(projects.snapshots)
+    api(projects.versionedCache)
     api(projects.workerMain)
     api(projects.buildProcessServices)
     api(projects.instrumentationReporting)
@@ -120,21 +121,21 @@ dependencies {
     api(libs.ant)
     api(libs.asm)
     api(libs.asmTree)
-    api(libs.commonsCompress)
     api(libs.groovy)
     api(libs.guava)
     api(libs.inject)
     api(libs.jsr305)
+    api(libs.nativePlatform)
 
     implementation(projects.buildOperationsTrace)
     implementation(projects.io)
     implementation(projects.inputTracking)
     implementation(projects.modelGroovy)
-    implementation(projects.serviceRegistryBuilder)
     implementation(projects.problemsRendering)
+    implementation(projects.serviceRegistryBuilder)
 
-    implementation(libs.nativePlatform)
     implementation(libs.asmCommons)
+    implementation(libs.commonsCompress)
     implementation(libs.commonsIo)
     implementation(libs.commonsLang)
     implementation(libs.commonsLang3)
@@ -142,7 +143,6 @@ dependencies {
     implementation(libs.fastutil)
     implementation(libs.groovyAnt)
     implementation(libs.groovyJson)
-    implementation(libs.groovyTemplates)
     implementation(libs.groovyXml)
     implementation(libs.slf4jApi)
     implementation(libs.tomlj) {
@@ -169,6 +169,7 @@ dependencies {
     // TODO investigate why we depend on SSHD as a platform for internal-integ-testing
     runtimeOnly(libs.antJunit)
 
+    testImplementation(projects.buildInit)
     testImplementation(projects.platformJvm)
     testImplementation(projects.platformNative)
     testImplementation(projects.testingBase)
@@ -267,9 +268,10 @@ dependencies {
     testImplementation(testFixtures(projects.modelCore))
     testImplementation(testFixtures(projects.logging))
     testImplementation(testFixtures(projects.baseServices))
-    testImplementation(testFixtures(projects.diagnostics))
+    testImplementation(testFixtures(projects.baseDiagnostics))
     testImplementation(testFixtures(projects.snapshots))
     testImplementation(testFixtures(projects.execution))
+    testImplementation(testFixtures(projects.time))
 
     integTestImplementation(projects.workers)
     integTestImplementation(projects.dependencyManagement)

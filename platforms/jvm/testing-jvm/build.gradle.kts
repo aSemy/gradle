@@ -1,6 +1,5 @@
 plugins {
     id("gradlebuild.distribution.api-java")
-    id("gradlebuild.instrumented-java-project")
 }
 
 description = """JVM-specific testing functionality, including the Test type and support for configuring options for and detecting
@@ -11,12 +10,6 @@ This project is a implementation dependency of many other testing-related subpro
 dependency for any projects working directly with Test tasks.
 """
 
-errorprone {
-    disabledChecks.addAll(
-        "EmptyBlockTag", // 1 occurrences
-    )
-}
-
 dependencies {
     api(projects.stdlibJavaExtensions)
     api(projects.time)
@@ -24,9 +17,10 @@ dependencies {
     api(projects.buildOperations)
     api(projects.core)
     api(projects.coreApi)
+    api(projects.fileOperations)
     api(projects.logging)
     api(projects.messaging)
-    api(projects.processServices)
+    api(projects.modelCore)
     api(projects.reporting)
     api(projects.testingBase)
     api(projects.testingBaseInfrastructure)
@@ -46,7 +40,6 @@ dependencies {
     implementation(projects.functional)
     implementation(projects.jvmServices)
     implementation(projects.loggingApi)
-    implementation(projects.modelCore)
     implementation(projects.platformBase)
     implementation(projects.testingJvmInfrastructure)
 
@@ -58,6 +51,7 @@ dependencies {
 
     testImplementation(testFixtures(projects.core))
     testImplementation(testFixtures(projects.modelCore))
+    testImplementation(testFixtures(projects.time))
 
     integTestImplementation(testFixtures(projects.testingBase))
     integTestImplementation(testFixtures(projects.languageGroovy))

@@ -12,9 +12,11 @@ dependencies {
     implementation(projects.cleanup)
     implementation(projects.dependencyModules)
     implementation(projects.jvm)
+    implementation(projects.packaging)
     implementation(projects.profiling)
 
-    implementation("org.gradle.kotlin:gradle-kotlin-dsl-conventions")
     implementation(kotlin("gradle-plugin"))
-    implementation("com.autonomousapps:dependency-analysis-gradle-plugin")
+    implementation("com.autonomousapps:dependency-analysis-gradle-plugin") {
+        exclude(group = "com.google.j2objc", module = "j2objc-annotations") // This has no use in Gradle
+    }
 }

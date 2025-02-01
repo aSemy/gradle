@@ -26,7 +26,7 @@ import org.gradle.api.internal.artifacts.transform.TransformActionScheme
 import org.gradle.api.internal.artifacts.transform.TransformParameterScheme
 import org.gradle.api.internal.artifacts.transform.TransformStepNode
 import org.gradle.api.internal.artifacts.transform.TransformStepNodeFactory
-import org.gradle.api.internal.attributes.ImmutableAttributesFactory
+import org.gradle.api.internal.attributes.AttributesFactory
 import org.gradle.api.internal.file.FileCollectionFactory
 import org.gradle.api.internal.file.FileFactory
 import org.gradle.api.internal.file.FileLookup
@@ -36,7 +36,7 @@ import org.gradle.api.internal.file.FileResolver
 import org.gradle.api.internal.file.collections.DirectoryFileTreeFactory
 import org.gradle.api.internal.provider.PropertyFactory
 import org.gradle.api.internal.provider.ValueSourceProviderFactory
-import org.gradle.api.model.ObjectFactory
+import org.gradle.api.problems.internal.InternalProblems
 import org.gradle.api.tasks.util.PatternSet
 import org.gradle.composite.internal.BuildTreeWorkGraphController
 import org.gradle.execution.plan.OrdinalGroupFactory
@@ -51,6 +51,7 @@ import org.gradle.internal.operations.BuildOperationRunner
 import org.gradle.internal.reflect.Instantiator
 import org.gradle.internal.serialize.BaseSerializerFactory.HASHCODE_SERIALIZER
 import org.gradle.internal.serialize.codecs.core.BooleanValueSnapshotCodec
+import org.gradle.internal.serialize.codecs.core.BuildServiceParameterCodec
 import org.gradle.internal.serialize.codecs.core.BuildServiceProviderCodec
 import org.gradle.internal.serialize.codecs.core.CachedEnvironmentStateCodec
 import org.gradle.internal.serialize.codecs.core.CalculatedValueContainerCodec
@@ -149,7 +150,6 @@ class Codecs(
     propertyFactory: PropertyFactory,
     filePropertyFactory: FilePropertyFactory,
     fileResolver: FileResolver,
-    objectFactory: ObjectFactory,
     instantiator: Instantiator,
     fileSystemOperations: FileSystemOperations,
     val taskNodeFactory: TaskNodeFactory,
@@ -161,7 +161,7 @@ class Codecs(
     managedFactoryRegistry: ManagedFactoryRegistry,
     parameterScheme: TransformParameterScheme,
     actionScheme: TransformActionScheme,
-    attributesFactory: ImmutableAttributesFactory,
+    attributesFactory: AttributesFactory,
     valueSourceProviderFactory: ValueSourceProviderFactory,
     calculatedValueContainerFactory: CalculatedValueContainerFactory,
     patternSetFactory: Factory<PatternSet>,
@@ -174,7 +174,8 @@ class Codecs(
     flowProviders: FlowProviders,
     transformStepNodeFactory: TransformStepNodeFactory,
     val parallelStore: Boolean = true,
-    val parallelLoad: Boolean = true
+    val parallelLoad: Boolean = true,
+    problems: InternalProblems
 ) {
     private
     val userTypesBindings: Bindings
@@ -189,6 +190,8 @@ class Codecs(
             baseTypes()
 
             bind(HASHCODE_SERIALIZER)
+
+            bind(BuildServiceParameterCodec)
 
             providersBlock()
 
@@ -219,15 +222,15 @@ class Codecs(
             bind(TransformedExternalArtifactSetCodec())
             bind(CalculateArtifactsCodec(calculatedValueContainerFactory))
             bind(TransformedArtifactCodec(calculatedValueContainerFactory))
-            bind(LocalFileDependencyBackedArtifactSetCodec(instantiator, attributesFactory, calculatedValueContainerFactory))
+            bind(LocalFileDependencyBackedArtifactSetCodec(attributesFactory, calculatedValueContainerFactory))
             bind(CalculatedValueContainerCodec(calculatedValueContainerFactory))
-            bind(IsolateTransformParametersCodec(parameterScheme, isolatableFactory, buildOperationRunner, classLoaderHierarchyHasher, fileCollectionFactory, documentationRegistry))
+            bind(IsolateTransformParametersCodec(parameterScheme, isolatableFactory, buildOperationRunner, classLoaderHierarchyHasher, fileCollectionFactory, documentationRegistry, problems))
             bind(FinalizeTransformDependenciesNodeCodec())
             bind(ResolveArtifactNodeCodec)
             bind(WorkNodeActionCodec)
             bind(CapabilitySerializer())
 
-            bind(DefaultCopySpecCodec(patternSetFactory, fileCollectionFactory, objectFactory, instantiator, fileSystemOperations))
+            bind(DefaultCopySpecCodec(patternSetFactory, fileCollectionFactory, propertyFactory, instantiator, fileSystemOperations))
             bind(DestinationRootCopySpecCodec(fileResolver))
 
             bind(TaskReferenceCodec)

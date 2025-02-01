@@ -1,16 +1,8 @@
 plugins {
     id("gradlebuild.distribution.api-java")
-    id("gradlebuild.instrumented-java-project")
 }
 
 description = "Publishing plugin for Ivy repositories"
-
-errorprone {
-    disabledChecks.addAll(
-        "UnusedMethod", // 2 occurrences
-        "UnusedVariable", // 1 occurrences
-    )
-}
 
 dependencies {
     api(projects.stdlibJavaExtensions)

@@ -18,6 +18,7 @@ package org.gradle.integtests.resolve
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.extensions.FluidDependenciesResolveTest
+import org.gradle.util.internal.ToBeImplemented
 import spock.lang.Issue
 
 import static org.gradle.api.internal.DocumentationRegistry.BASE_URL
@@ -32,12 +33,11 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
     @Issue("GRADLE-2889")
     def "detached configurations may have separate dependencies"() {
         given:
-        createDirs("a", "b")
         settingsFile << "include 'a', 'b'"
         mavenRepo.module("org", "foo").publish()
         mavenRepo.module("org", "bar").publish()
 
-        buildFile << """
+        def common = """
             abstract class CheckDependencies extends DefaultTask {
                 @Internal
                 abstract Property<ResolvedComponentResult> getResult()
@@ -52,29 +52,34 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
                 }
             }
 
-            allprojects {
-                configurations {
-                    foo
-                }
-                repositories {
-                    maven { url "${mavenRepo.uri}" }
-                }
+            configurations {
+                foo
+            }
+            repositories {
+                maven { url = "${mavenRepo.uri}" }
+            }
 
-                tasks.register("checkDependencies", CheckDependencies) {
-                    def detached = project.configurations.detachedConfiguration(project.configurations.foo.dependencies as Dependency[])
-                    result = detached.incoming.resolutionResult.rootComponent
-                    declared = provider { project.configurations.foo.dependencies*.name }
-                }
+            tasks.register("checkDependencies", CheckDependencies) {
+                def detached = project.configurations.detachedConfiguration(project.configurations.foo.dependencies as Dependency[])
+                result = detached.incoming.resolutionResult.rootComponent
+                declared = provider { project.configurations.foo.dependencies*.name }
             }
-            project(":a") {
-                dependencies {
-                    foo "org:foo:1.0"
-                }
+        """
+
+        buildFile << common
+        file("a/build.gradle") << """
+            $common
+
+            dependencies {
+                foo "org:foo:1.0"
             }
-            project(":b") {
-                dependencies {
-                    foo "org:bar:1.0"
-                }
+        """
+
+        file("b/build.gradle") << """
+            $common
+
+            dependencies {
+                foo "org:bar:1.0"
             }
         """
 
@@ -84,7 +89,6 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
 
     def "detached configurations may have dependencies on other projects"() {
         given:
-        createDirs("other")
         settingsFile << "include 'other'"
         buildFile << """
             plugins {
@@ -128,6 +132,8 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
         run "checkDependencies"
     }
 
+    @ToBeImplemented("Reverted to the old behavior to fix performance regression")
+    @Issue("https://github.com/gradle/gradle/issues/30239")
     def "detached configuration can resolve project dependency targeting current project"() {
         buildFile << """
             task zip(type: Zip) {
@@ -155,9 +161,12 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
                 }
             }
         """
+        // Remove when test fixed:
+        disableProblemsApiCheck()
+        executer.noDeprecationChecks()
 
         expect:
-        succeeds("resolve")
+        fails("resolve")
     }
 
     def "configurations container reserves name #name for detached configurations"() {
@@ -187,6 +196,8 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
         name << ["detachedConfiguration", "detachedConfiguration1", "detachedConfiguration22902"]
     }
 
+    @ToBeImplemented("Reverted to the old behavior to fix performance regression")
+    @Issue("https://github.com/gradle/gradle/issues/30239")
     def "detached configuration has a different component ID and module version ID than the root component"() {
         mavenRepo.module("org", "foo").publish()
 
@@ -225,9 +236,12 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
                 }
             }
         """
+        // Remove when test fixed:
+        disableProblemsApiCheck()
+        executer.noDeprecationChecks()
 
         expect:
-        succeeds("resolve")
+        fails("resolve")
 
         where:
         // We test with and without dependencies, to test with and without the
@@ -235,6 +249,8 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
         withDependencies << [true, false]
     }
 
+    @ToBeImplemented("Reverted to the old behavior to fix performance regression")
+    @Issue("https://github.com/gradle/gradle/issues/30239")
     def "can copy a detached configuration"() {
         mavenRepo.module("org", "foo").publish()
 
@@ -264,8 +280,30 @@ class DetachedConfigurationsIntegrationTest extends AbstractIntegrationSpec {
                 }
             }
         """
+        // Remove when test fixed:
+        disableProblemsApiCheck()
+        executer.noDeprecationChecks()
 
         expect:
-        succeeds("resolve")
+        fails("resolve")
+    }
+
+    @Issue("https://github.com/gradle/gradle/issues/30239")
+    def "detached configuration can not extend configurations"() {
+        disableProblemsApiCheck()
+
+        given:
+        buildFile << """
+            plugins {
+                id 'java-library'
+            }
+
+            def detached = project.configurations.detachedConfiguration()
+            detached.extendsFrom(project.configurations.implementation)
+        """
+
+        expect:
+        executer.expectDocumentedDeprecationWarning("Calling extendsFrom on configuration ':detachedConfiguration1' has been deprecated. This will fail with an error in Gradle 9.0. Detached configurations should not extend other configurations, this was extending: 'implementation'. Consult the upgrading guide for further information: https://docs.gradle.org/current/userguide/upgrading_version_8.html#detached_configurations_cannot_extend")
+        succeeds "tasks"
     }
 }

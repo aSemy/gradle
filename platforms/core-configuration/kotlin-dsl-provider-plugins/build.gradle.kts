@@ -12,6 +12,8 @@ dependencies {
     api(projects.logging)
     api(projects.serviceProvider)
     api(projects.stdlibJavaExtensions)
+    api(projects.persistentCache)
+    api(projects.declarativeDslToolingModels)
 
     api(libs.inject)
     api(libs.kotlinStdlib)
@@ -31,6 +33,8 @@ dependencies {
     implementation(projects.toolingApi)
     implementation(projects.toolchainsJvm)
     implementation(projects.toolchainsJvmShared)
+    implementation(projects.declarativeDslEvaluator)
+    implementation(projects.declarativeDslCore)
 
     implementation(libs.futureKotlin("scripting-compiler-impl-embeddable")) {
         isTransitive = false
@@ -46,7 +50,4 @@ dependencies {
 
 packageCycles {
     excludePatterns.add("org/gradle/kotlin/dsl/provider/plugins/precompiled/tasks/**")
-}
-tasks.isolatedProjectsIntegTest {
-    enabled = false
 }

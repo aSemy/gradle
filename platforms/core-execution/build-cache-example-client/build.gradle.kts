@@ -19,7 +19,7 @@ plugins {
     id("application")
 }
 
-description = "Example client application using the build-cache library"
+description = "Example client application using the build cache library"
 
 dependencies {
     implementation(projects.buildCache)
@@ -36,6 +36,7 @@ dependencies {
     implementation(projects.stdlibJavaExtensions)
     implementation(projects.persistentCache)
     implementation(projects.snapshots)
+    implementation(projects.time)
 
     implementation(libs.commonsIo)
     implementation(libs.guava)
@@ -46,7 +47,4 @@ dependencies {
 
 application {
     mainClass = "org.gradle.caching.example.ExampleBuildCacheClient"
-}
-tasks.isolatedProjectsIntegTest {
-    enabled = false
 }

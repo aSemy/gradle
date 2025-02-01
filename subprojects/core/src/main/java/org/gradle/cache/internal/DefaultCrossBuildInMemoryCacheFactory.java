@@ -17,9 +17,9 @@
 package org.gradle.cache.internal;
 
 import org.gradle.cache.ManualEvictionInMemoryCache;
-import org.gradle.internal.session.BuildSessionLifecycleListener;
 import org.gradle.internal.classloader.VisitableURLClassLoader;
 import org.gradle.internal.event.ListenerManager;
+import org.gradle.internal.session.BuildSessionLifecycleListener;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -57,6 +58,25 @@ public class DefaultCrossBuildInMemoryCacheFactory implements CrossBuildInMemory
         listenerManager.addListener(cache);
         return cache;
     }
+
+    @Override
+    public <K, V> CrossBuildInMemoryCache<K, V> newCache(Consumer<V> onReuse) {
+        DefaultCrossBuildInMemoryCache<K, V> cache = new DefaultCrossBuildInMemoryCache<K, V>(new HashMap<>()) {
+            @Nullable
+            @Override
+            protected V maybeGetRetainedValue(K key) {
+                V v = super.maybeGetRetainedValue(key);
+                if (v != null) {
+                    // This callback better be swift as it runs under the cache lock.
+                    onReuse.accept(v);
+                }
+                return v;
+            }
+        };
+        listenerManager.addListener(cache);
+        return cache;
+    }
+
 
     @Override
     public <K, V> CrossBuildInMemoryCache<K, V> newCacheRetainingDataFromPreviousBuild(Predicate<V> retentionFilter) {
@@ -147,6 +167,7 @@ public class DefaultCrossBuildInMemoryCacheFactory implements CrossBuildInMemory
         }
 
         // Caller must be holding lock
+        @Nullable
         private V getIfPresentWithoutLock(K key) {
             V v = valuesForThisSession.get(key);
             if (v != null) {

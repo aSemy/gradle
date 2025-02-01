@@ -150,7 +150,7 @@ abstract class AbstractUserTypeCodecTest {
             beanStateReaderLookup = beanStateReaderLookupForTesting(),
             logger = mock(),
             problemsListener = mock(),
-            classDecoder = DefaultClassDecoder()
+            classDecoder = DefaultClassDecoder(mock(), mock())
         )
 
     private
@@ -165,7 +165,6 @@ abstract class AbstractUserTypeCodecTest {
         propertyFactory = mock(),
         filePropertyFactory = mock(),
         fileResolver = mock(),
-        objectFactory = mock(),
         instantiator = mock(),
         fileSystemOperations = mock(),
         taskNodeFactory = mock(),
@@ -189,6 +188,7 @@ abstract class AbstractUserTypeCodecTest {
         javaSerializationEncodingLookup = JavaSerializationEncodingLookup(),
         flowProviders = mock(),
         transformStepNodeFactory = mock(),
+        problems = mock(),
     )
 }
 

@@ -34,6 +34,7 @@ import org.gradle.configuration.project.LifecycleProjectEvaluator
 import org.gradle.configuration.project.PluginsProjectConfigureActions
 import org.gradle.configuration.project.ProjectEvaluator
 import org.gradle.initialization.BuildCancellationToken
+import org.gradle.initialization.Environment
 import org.gradle.initialization.SettingsPreparer
 import org.gradle.initialization.TaskExecutionPreparer
 import org.gradle.initialization.VintageBuildModelController
@@ -44,6 +45,7 @@ import org.gradle.internal.build.BuildModelControllerServices
 import org.gradle.internal.build.BuildState
 import org.gradle.internal.buildtree.BuildModelParameters
 import org.gradle.internal.buildtree.IntermediateBuildActionRunner
+import org.gradle.internal.cc.base.services.ProjectRefResolver
 import org.gradle.internal.cc.impl.fingerprint.ConfigurationCacheFingerprintController
 import org.gradle.internal.cc.impl.services.ConfigurationCacheEnvironment
 import org.gradle.internal.cc.impl.services.DefaultEnvironment
@@ -61,7 +63,6 @@ import org.gradle.internal.service.ServiceRegistrationProvider
 import org.gradle.internal.service.ServiceRegistry
 import org.gradle.internal.service.scopes.ServiceRegistryFactory
 import org.gradle.invocation.DefaultGradle
-import org.gradle.invocation.GradleLifecycleActionExecutor
 import org.gradle.tooling.provider.model.internal.DefaultIntermediateToolingModelProvider
 import org.gradle.tooling.provider.model.internal.IntermediateToolingModelProvider
 import org.gradle.tooling.provider.model.internal.ToolingModelParameterCarrier
@@ -79,9 +80,10 @@ class DefaultBuildModelControllerServices(
             if (buildModelParameters.isConfigurationCache) {
                 registration.addProvider(ConfigurationCacheBuildControllerProvider())
                 registration.add(ConfigurationCacheEnvironment::class.java)
+                registration.add(ProjectRefResolver::class.java)
             } else {
                 registration.addProvider(VintageBuildControllerProvider())
-                registration.add(DefaultEnvironment::class.java)
+                registration.add(Environment::class.java, DefaultEnvironment::class.java)
             }
             if (buildModelParameters.isIsolatedProjects) {
                 registration.addProvider(ConfigurationCacheIsolatedProjectsProvider())
@@ -168,9 +170,8 @@ class DefaultBuildModelControllerServices(
             dynamicCallProblemReporting: DynamicCallProblemReporting,
             buildModelParameters: BuildModelParameters,
             instantiator: Instantiator,
-            gradleLifecycleActionExecutor: GradleLifecycleActionExecutor
         ): CrossProjectModelAccess {
-            val delegate = VintageIsolatedProjectsProvider().createCrossProjectModelAccess(projectRegistry, instantiator, gradleLifecycleActionExecutor)
+            val delegate = VintageIsolatedProjectsProvider().createCrossProjectModelAccess(projectRegistry)
             return ProblemReportingCrossProjectModelAccess(
                 delegate,
                 problemsListener,
@@ -203,11 +204,9 @@ class DefaultBuildModelControllerServices(
     class VintageIsolatedProjectsProvider : ServiceRegistrationProvider {
         @Provides
         fun createCrossProjectModelAccess(
-            projectRegistry: ProjectRegistry<ProjectInternal>,
-            instantiator: Instantiator,
-            gradleLifecycleActionExecutor: GradleLifecycleActionExecutor
+            projectRegistry: ProjectRegistry<ProjectInternal>
         ): CrossProjectModelAccess {
-            return DefaultCrossProjectModelAccess(projectRegistry, instantiator, gradleLifecycleActionExecutor)
+            return DefaultCrossProjectModelAccess(projectRegistry)
         }
 
         @Provides
