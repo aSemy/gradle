@@ -18,18 +18,18 @@ package org.gradle.api.problems.internal;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
-import org.gradle.api.NonNullApi;
 import org.gradle.api.problems.DocLink;
 import org.gradle.api.problems.ProblemDefinition;
 import org.gradle.api.problems.ProblemId;
 import org.gradle.api.problems.Severity;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.io.Serializable;
 
 import static com.google.common.base.Objects.equal;
 
-@NonNullApi
+@NullMarked
 public class DefaultProblemDefinition implements Serializable, ProblemDefinition {
 
     private final ProblemId id;
@@ -82,4 +82,12 @@ public class DefaultProblemDefinition implements Serializable, ProblemDefinition
         return Objects.hashCode(id, severity, documentationLink);
     }
 
+    @Override
+    public String toString() {
+        return "DefaultProblemDefinition{" +
+            "id=" + id +
+            ", severity=" + severity +
+            ", documentationLink=" + documentationLink +
+            '}';
+    }
 }

@@ -22,9 +22,8 @@ import org.gradle.testkit.runner.BuildTask;
 import org.gradle.testkit.runner.TaskOutcome;
 import org.gradle.testkit.runner.internal.feature.BuildResultOutputFeatureCheck;
 import org.gradle.testkit.runner.internal.feature.FeatureCheck;
+import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.nio.charset.Charset;
 import java.util.List;
 
@@ -33,13 +32,13 @@ public class FeatureCheckBuildResult implements BuildResult {
     private final BuildResult delegateBuildResult;
     private final FeatureCheck outputFeatureCheck;
 
-    public FeatureCheckBuildResult(BuildOperationParameters buildOperationParameters, @Nonnull String output, List<BuildTask> tasks) {
+    public FeatureCheckBuildResult(BuildOperationParameters buildOperationParameters, String output, List<BuildTask> tasks) {
         this(buildOperationParameters, ByteSource.wrap(output.getBytes(Charset.defaultCharset())), tasks);
     }
 
     public FeatureCheckBuildResult(
         BuildOperationParameters buildOperationParameters,
-        @Nonnull ByteSource outputSource,
+        ByteSource outputSource,
         List<BuildTask> tasks
     ) {
         delegateBuildResult = new DefaultBuildResult(outputSource, tasks);

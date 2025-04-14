@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2009 the original author or authors.
+ * Copyright 2007 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ package org.gradle.api.internal.artifacts.ivyservice.moduleconverter.dependencie
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import org.gradle.api.Named;
+import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.artifacts.DependencyConstraint;
 import org.gradle.api.artifacts.ExcludeRule;
@@ -27,7 +29,6 @@ import org.gradle.api.artifacts.component.ComponentIdentifier;
 import org.gradle.api.attributes.Category;
 import org.gradle.api.internal.artifacts.configurations.ConfigurationInternal;
 import org.gradle.api.internal.artifacts.configurations.Configurations;
-import org.gradle.api.internal.artifacts.configurations.ConfigurationsProvider;
 import org.gradle.api.internal.artifacts.dependencies.SelfResolvingDependencyInternal;
 import org.gradle.api.internal.attributes.AttributeValue;
 import org.gradle.api.internal.attributes.ImmutableAttributes;
@@ -51,10 +52,14 @@ import org.gradle.internal.component.model.VariantResolveMetadata;
 import org.gradle.internal.model.CalculatedValue;
 import org.gradle.internal.model.CalculatedValueContainerFactory;
 import org.gradle.internal.model.ModelContainer;
+import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Encapsulates all logic required to build a {@link LocalVariantGraphResolveMetadata} from a
@@ -80,60 +85,56 @@ public class DefaultLocalVariantGraphResolveStateBuilder implements LocalVariant
     @Override
     public LocalVariantGraphResolveState createRootVariantState(
         ConfigurationInternal configuration,
-        ConfigurationsProvider configurationsProvider,
         ComponentIdentifier componentId,
         DependencyCache dependencyCache,
         ModelContainer<?> model,
         CalculatedValueContainerFactory calculatedValueContainerFactory
     ) {
-        // Starting in Gradle 9.0, the logic for creating the root variant and for creating a
-        // consumable variant will differ, as the root variant should not have artifacts.
-        // However, until then, since the root variant can still be consumed, it must have artifacts.
-        return doCreateVariantState(
-            configuration,
-            configurationsProvider,
-            componentId,
+        finalize(configuration, "resolved");
+
+        ImmutableAttributes attributes = configuration.getAttributes().asImmutable();
+        CalculatedValue<DefaultLocalVariantGraphResolveState.VariantDependencyMetadata> dependencies = getConfigurationDependencyState(
+            configuration.asDescribable(),
+            configuration.getHierarchy(),
+            attributes,
             dependencyCache,
             model,
+            calculatedValueContainerFactory
+        );
+
+        // TODO: The root node should have no capabilities, as it has no artifacts.
+        // However, changing this prevents conflicts between code being compiled and its
+        // dependencies from being detected during compilation -- though this also
+        // can lead to some false positives.
+        ImmutableCapabilities capabilities = ImmutableCapabilities.of(Configurations.collectCapabilities(configuration, new HashSet<>(), new HashSet<>()));
+        LocalVariantGraphResolveMetadata metadata = new DefaultLocalVariantGraphResolveMetadata(
+            configuration.getName(),
+            configuration.isTransitive(),
+            attributes,
+            capabilities,
+            false
+        );
+
+        return new DefaultLocalVariantGraphResolveState(
+            idGenerator.nextVariantId(),
+            componentId,
+            metadata,
+            idGenerator,
             calculatedValueContainerFactory,
-            "resolved"
+            dependencies,
+            Collections.emptySet()
         );
     }
 
     @Override
     public LocalVariantGraphResolveState createConsumableVariantState(
         ConfigurationInternal configuration,
-        ConfigurationsProvider configurationsProvider,
         ComponentIdentifier componentId,
         DependencyCache dependencyCache,
         ModelContainer<?> model,
         CalculatedValueContainerFactory calculatedValueContainerFactory
     ) {
-        return doCreateVariantState(
-            configuration,
-            configurationsProvider,
-            componentId,
-            dependencyCache,
-            model,
-            calculatedValueContainerFactory,
-            "consumed as a variant"
-        );
-    }
-
-    private DefaultLocalVariantGraphResolveState doCreateVariantState(
-        ConfigurationInternal configuration,
-        ConfigurationsProvider configurationsProvider,
-        ComponentIdentifier componentId,
-        DependencyCache dependencyCache,
-        ModelContainer<?> model,
-        CalculatedValueContainerFactory calculatedValueContainerFactory,
-        String observationReason
-    ) {
-        // Perform any final mutating actions for this configuration and its parents.
-        // Then, lock this configuration and its parents from mutation.
-        // After we observe a configuration (by building its metadata), its state should not change.
-        configuration.runDependencyActions();
-        configuration.markAsObserved(observationReason);
+        finalize(configuration, "consumed as a variant");
 
         String configurationName = configuration.getName();
         ComponentConfigurationIdentifier configurationIdentifier = new ComponentConfigurationIdentifier(componentId, configurationName);
@@ -157,13 +158,14 @@ public class DefaultLocalVariantGraphResolveStateBuilder implements LocalVariant
             }
         });
 
-        // Collect all dependencies and excludes in hierarchy.
-        // After running the dependency actions and preventing from mutation above, we know the
-        // hierarchy will not change anymore and all configurations in the hierarchy
-        // will no longer be mutated.
-        ImmutableSet<String> hierarchy = Configurations.getNames(configuration.getHierarchy());
-        CalculatedValue<DefaultLocalVariantGraphResolveState.VariantDependencyMetadata> dependencies =
-            getConfigurationDependencyState(configuration.asDescribable(), hierarchy, attributes, configurationsProvider, dependencyCache, model, calculatedValueContainerFactory);
+        CalculatedValue<DefaultLocalVariantGraphResolveState.VariantDependencyMetadata> dependencies = getConfigurationDependencyState(
+            configuration.asDescribable(),
+            configuration.getHierarchy(),
+            attributes,
+            dependencyCache,
+            model,
+            calculatedValueContainerFactory
+        );
 
         LocalVariantGraphResolveMetadata metadata = new DefaultLocalVariantGraphResolveMetadata(
             configurationName,
@@ -182,6 +184,19 @@ public class DefaultLocalVariantGraphResolveStateBuilder implements LocalVariant
             dependencies,
             artifactSets.build()
         );
+    }
+
+    /**
+     * Perform any final mutating actions for this configuration and its parents.
+     * Then, lock this configuration and its parents from mutation.
+     * After we observe a configuration (by building its metadata), its state should not change.
+     */
+    private static void finalize(ConfigurationInternal configuration, String reason) {
+        // Perform any final mutating actions for this configuration and its parents.
+        // Then, lock this configuration and its parents from mutation.
+        // After we observe a configuration (by building its metadata), its state should not change.
+        configuration.runDependencyActions();
+        configuration.markAsObserved(reason);
     }
 
     private static CalculatedValue<ImmutableList<LocalComponentArtifactMetadata>> getVariantArtifacts(
@@ -211,9 +226,8 @@ public class DefaultLocalVariantGraphResolveStateBuilder implements LocalVariant
      */
     private CalculatedValue<DefaultLocalVariantGraphResolveState.VariantDependencyMetadata> getConfigurationDependencyState(
         DisplayName description,
-        ImmutableSet<String> hierarchy,
+        Set<Configuration> hierarchy,
         ImmutableAttributes attributes,
-        ConfigurationsProvider configurationsProvider,
         DependencyCache dependencyCache,
         ModelContainer<?> model,
         CalculatedValueContainerFactory calculatedValueContainerFactory
@@ -223,13 +237,15 @@ public class DefaultLocalVariantGraphResolveStateBuilder implements LocalVariant
             ImmutableSet.Builder<LocalFileDependencyMetadata> files = ImmutableSet.builder();
             ImmutableList.Builder<ExcludeMetadata> excludes = ImmutableList.builder();
 
-            configurationsProvider.visitAll(config -> {
-                if (hierarchy.contains(config.getName())) {
-                    DependencyState defined = getDefinedState(config, dependencyCache);
-                    dependencies.addAll(defined.dependencies);
-                    files.addAll(defined.files);
-                    excludes.addAll(defined.excludes);
-                }
+            // For historical reasons, and to maintain behavior, dependencies
+            // are ordered based on the name of the extended configurations.
+            ArrayList<Configuration> sortedHierarchy = new ArrayList<>(hierarchy);
+            sortedHierarchy.sort(Comparator.comparing(Named::getName));
+            sortedHierarchy.forEach(config -> {
+                DependencyState defined = getDefinedState((ConfigurationInternal) config, dependencyCache);
+                dependencies.addAll(defined.dependencies);
+                files.addAll(defined.files);
+                excludes.addAll(defined.excludes);
             });
 
             DependencyState state = new DependencyState(dependencies.build(), files.build(), excludes.build());

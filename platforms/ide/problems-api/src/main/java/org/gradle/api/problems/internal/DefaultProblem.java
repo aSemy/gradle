@@ -17,20 +17,18 @@
 package org.gradle.api.problems.internal;
 
 import com.google.common.base.Objects;
-import org.gradle.api.NonNullApi;
 import org.gradle.api.problems.AdditionalData;
 import org.gradle.api.problems.ProblemDefinition;
 import org.gradle.api.problems.ProblemLocation;
-import org.gradle.internal.reflect.Instantiator;
-import org.gradle.tooling.internal.provider.serialization.PayloadSerializer;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.util.List;
 
 import static com.google.common.base.Objects.equal;
 
-@NonNullApi
+@NullMarked
 public class DefaultProblem implements Serializable, InternalProblem {
     private final ProblemDefinition problemDefinition;
     private final String contextualLabel;
@@ -106,8 +104,8 @@ public class DefaultProblem implements Serializable, InternalProblem {
     }
 
     @Override
-    public InternalProblemBuilder toBuilder(AdditionalDataBuilderFactory additionalDataBuilderFactory, Instantiator instantiator, PayloadSerializer payloadSerializer) {
-        return new DefaultProblemBuilder(this, additionalDataBuilderFactory, instantiator, payloadSerializer);
+    public InternalProblemBuilder toBuilder(ProblemsInfrastructure infrastructure) {
+        return new DefaultProblemBuilder(this, infrastructure);
     }
 
     @Override
@@ -133,4 +131,17 @@ public class DefaultProblem implements Serializable, InternalProblem {
         return Objects.hashCode(problemDefinition, contextualLabel, solutions, originLocations, details, exception, additionalData);
     }
 
+    @Override
+    public String toString() {
+        return "DefaultProblem{" +
+            "problemDefinition=" + problemDefinition +
+            ", contextualLabel='" + contextualLabel + '\'' +
+            ", solutions=" + solutions +
+            ", originLocations=" + originLocations +
+            ", contextualLocations=" + contextualLocations +
+            ", details='" + details + '\'' +
+            ", exception=" + (exception != null ? exception.toString() : "null") +
+            ", additionalData=" + additionalData +
+            '}';
+    }
 }

@@ -17,8 +17,7 @@
 package org.gradle.api.problems.internal;
 
 import com.google.common.base.Objects;
-
-import javax.annotation.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Represents an applied plugin ID.
@@ -32,7 +31,6 @@ public class DefaultPluginIdLocation implements PluginIdLocation {
     }
 
     @Override
-    @Nullable
     public String getPluginId() {
         return pluginId;
     }

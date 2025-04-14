@@ -187,6 +187,7 @@ dependencies {
     kotlinDslSharedRuntime(kotlin("stdlib", embeddedKotlinVersion))
     kotlinDslSharedRuntime("org.ow2.asm:asm-tree")
     kotlinDslSharedRuntime("com.google.code.findbugs:jsr305")
+    kotlinDslSharedRuntime("org.jspecify:jspecify")
 }
 val gradleApiKotlinExtensions by tasks.registering(GenerateKotlinExtensionsForGradleApi::class) {
     sharedRuntimeClasspath.from(kotlinDslSharedRuntimeClasspath)
@@ -198,7 +199,11 @@ val gradleApiKotlinExtensions by tasks.registering(GenerateKotlinExtensionsForGr
 
 apply<KotlinBaseApiPlugin>()
 plugins.withType(KotlinBaseApiPlugin::class) {
-    registerKotlinJvmCompileTask("compileGradleApiKotlinExtensions", "gradle-kotlin-dsl-extensions")
+    @Suppress("DEPRECATION")
+    registerKotlinJvmCompileTask(
+        "compileGradleApiKotlinExtensions",
+        "gradle-kotlin-dsl-extensions"
+    )
 }
 
 val compileGradleApiKotlinExtensions = tasks.named("compileGradleApiKotlinExtensions", KotlinCompile::class) {

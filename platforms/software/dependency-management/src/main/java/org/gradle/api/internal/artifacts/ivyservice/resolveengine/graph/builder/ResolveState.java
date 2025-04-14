@@ -53,8 +53,8 @@ import org.gradle.internal.component.model.GraphVariantSelector;
 import org.gradle.internal.component.model.VariantGraphResolveState;
 import org.gradle.internal.resolve.resolver.ComponentMetaDataResolver;
 import org.gradle.internal.resolve.resolver.DependencyToComponentIdResolver;
+import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Comparator;
@@ -233,7 +233,7 @@ public class ResolveState implements ComponentStateFactory<ComponentState> {
         boolean isVirtualPlatformEdge = dependencyState.getDependency() instanceof LenientPlatformDependencyMetadata;
         SelectorState selectorState = selectors.computeIfAbsent(new SelectorCacheKey(dependencyState.getRequested(), ignoreVersion, isVirtualPlatformEdge), req -> {
             ModuleIdentifier moduleIdentifier = dependencyState.getModuleIdentifier();
-            return new SelectorState(idGenerator.nextGraphNodeId(), dependencyState, idResolver, this, moduleIdentifier, ignoreVersion);
+            return new SelectorState(dependencyState, idResolver, this, moduleIdentifier, ignoreVersion);
         });
         selectorState.update(dependencyState);
         return selectorState;

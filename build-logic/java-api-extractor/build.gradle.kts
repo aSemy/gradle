@@ -11,8 +11,8 @@ dependencies {
     //      but then we have an incompatibility between kotlinx-metadata versions.
     //      The error can be reproduced in production code by running an integration test
     //      that uses Kotlin DSL, like ManagedPropertyJavaInterOpIntegrationTest.
-    implementation("org.ow2.asm:asm:9.7")
-    implementation("com.google.guava:guava:32.1.2-jre") {
+    implementation("org.ow2.asm:asm:9.7.1")
+    implementation("com.google.guava:guava:33.4.6-jre") {
         isTransitive = false
     }
 }

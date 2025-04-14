@@ -21,9 +21,8 @@ import org.gradle.testkit.runner.BuildResult;
 import org.gradle.testkit.runner.BuildTask;
 import org.gradle.testkit.runner.TaskOutcome;
 import org.gradle.util.internal.CollectionUtils;
+import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Collections;
@@ -39,7 +38,7 @@ public class DefaultBuildResult implements BuildResult {
         this(ByteSource.wrap(output.getBytes(Charset.defaultCharset())), tasks);
     }
 
-    public DefaultBuildResult(@Nonnull ByteSource outputSource, List<BuildTask> tasks) {
+    public DefaultBuildResult(ByteSource outputSource, List<BuildTask> tasks) {
         this.outputSource = outputSource;
         this.tasks = tasks;
     }

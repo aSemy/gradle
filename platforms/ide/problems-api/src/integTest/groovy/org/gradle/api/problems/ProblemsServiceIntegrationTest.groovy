@@ -16,7 +16,8 @@
 
 package org.gradle.api.problems
 
-import org.gradle.api.problems.internal.TaskPathLocation
+import org.gradle.api.problems.internal.StackTraceLocation
+import org.gradle.api.problems.internal.TaskLocation
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.integtests.fixtures.GroovyBuildScriptLanguage
 import spock.lang.Issue
@@ -47,13 +48,13 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
         verifyAll(receivedProblem) {
             definition.id.fqid == 'generic:type'
             definition.id.displayName == 'label'
-            with(oneLocation(LineInFileLocation)) {
+            with(oneLocation(StackTraceLocation).fileLocation) {
                 length == -1
                 column == -1
                 line == 13
-                path == "build file '$buildFile.absolutePath'"
+                path == buildFile.absolutePath
             }
-            with(oneLocation(TaskPathLocation)) {
+            with(oneLocation(TaskLocation)) {
                 buildTreePath == ':reportProblem'
             }
         }
@@ -77,7 +78,7 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
 '''
 
         executer.expectDocumentedDeprecationWarning(
-            "Space-assignment syntax in Groovy DSL has been deprecated. " +
+            "Properties should be assigned using the 'propName = value' syntax. Setting a property via the Gradle-generated 'propName value' or 'propName(value)' syntax in Groovy DSL has been deprecated. " +
                 "This is scheduled to be removed in Gradle 10.0. Use assignment ('description = <value>') instead. " +
                 "Consult the upgrading guide for further information: https://docs.gradle.org/current/userguide/upgrading_version_8.html#groovy_space_assignment_syntax"
         )
@@ -85,19 +86,20 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
         expect:
         succeeds("test")
         verifyAll(receivedProblem(0)) {
-            definition.id.fqid == 'deprecation:space-assignment-syntax-in-groovy-dsl'
-            definition.id.displayName == 'Space-assignment syntax in Groovy DSL has been deprecated.'
-            def locations = allLocations(LineInFileLocation)
+            definition.id.fqid == 'deprecation:properties-should-be-assigned-using-the-propname-value-syntax-setting-a-property-via-the-gradle-generated-propname-value-or-propname-value-syntax-in-groovy-dsl'
+            definition.id.displayName == """Properties should be assigned using the 'propName = value' syntax. Setting a property via the Gradle-generated 'propName value' or 'propName(value)' syntax in Groovy DSL has been deprecated."""
+            originLocations.size() == 1
             //guarantee no duplicate locations
-            locations.size() == 1
-            with(locations) {
-                with(get(0)) {
+            originLocations.size() == 1
+            with(originLocations[0] as StackTraceLocation) {
+                with(fileLocation as LineInFileLocation) {
                     length == -1
                     column == -1
                     line == 10
-                    path == "build file '$buildFile.absolutePath'"
+                    path == buildFile.absolutePath
                 }
             }
+            contextualLocations.empty
         }
     }
 
@@ -118,11 +120,14 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
         verifyAll(receivedProblem) {
             definition.id.fqid == 'generic:type'
             definition.id.displayName == 'label'
-            with(oneLocation(LineInFileLocation)) {
-                length == -1
-                column == -1
-                line == 13
-                path == "build file '$buildFile.absolutePath'"
+            with(oneLocation(StackTraceLocation)) {
+                with(fileLocation as LineInFileLocation) {
+                    length == -1
+                    column == -1
+                    line == 13
+                    path == buildFile.absolutePath
+                }
+                stackTrace.find { it.className == 'ProblemReportingTask' && it.methodName == 'run' }
             }
         }
 
@@ -157,18 +162,15 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
         run('reportProblem')
 
         then:
-        verifyAll(receivedProblem.originLocations) {
-            size() == 2
-            with(get(0) as OffsetInFileLocation) {
+        verifyAll(receivedProblem) {
+            originLocations.size() == 1
+            with(originLocations[0] as OffsetInFileLocation) {
                 path == 'test-location'
                 offset == 1
                 length == 2
             }
-            with(get(1) as LineInFileLocation) {
-                length == -1
-                column == -1
-                line == 13
-                path == "build file '$buildFile.absolutePath'"
+            with(contextualLocations[0] as TaskLocation) {
+                buildTreePath == ':reportProblem'
             }
         }
     }
@@ -186,20 +188,16 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
         run('reportProblem')
 
         then:
-        verifyAll(receivedProblem.originLocations) {
-            size() == 2
-            with(get(0) as LineInFileLocation) {
+        verifyAll(receivedProblem) {
+            originLocations.size() == 1
+            with(originLocations[0] as LineInFileLocation) {
                 length == -1
                 column == 2
                 line == 1
                 path == 'test-location'
             }
-            with(get(1) as LineInFileLocation) {
-                length == -1
-                column == -1
-                line == 13
-                path == "build file '$buildFile.absolutePath'"
-            }
+            contextualLocations.size() == 1
+            (contextualLocations.get(0) as TaskLocation).buildTreePath == ':reportProblem'
         }
     }
 
@@ -313,11 +311,11 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
         verifyAll(receivedProblem) {
             definition.id.fqid == 'problems-api:unsupported-additional-data'
             definition.id.displayName == 'Unsupported additional data type'
-            with(oneLocation(LineInFileLocation)) {
+            with(oneLocation(StackTraceLocation).fileLocation as LineInFileLocation) {
                 length == -1
                 column == -1
                 line == 13
-                path == "build file '$buildFile.absolutePath'"
+                path == buildFile.absolutePath
             }
         }
     }
@@ -365,7 +363,7 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
             for (int i = 0; i < 10; i++) {
                 problems.getReporter().report(problemId) {
                         it.severity(Severity.WARNING)
-                        .solution("solution")
+                        .solution("solution \$i")
                 }
             }
         """
@@ -374,12 +372,12 @@ class ProblemsServiceIntegrationTest extends AbstractIntegrationSpec {
         run("reportProblem")
 
         then:
-        10.times {
-            verifyAll(receivedProblem(it)) {
+        10.times { index ->
+            verifyAll(receivedProblem(index)) {
                 definition.id.displayName == 'label'
                 definition.id.name == 'type'
                 definition.severity == Severity.WARNING
-                solutions == ["solution"]
+                solutions == ["solution $index"]
             }
         }
     }

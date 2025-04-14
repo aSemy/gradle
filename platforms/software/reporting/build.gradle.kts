@@ -29,7 +29,7 @@ dependencies {
 
     api(libs.groovy)
     api(libs.inject)
-    api(libs.jsr305)
+    api(libs.jspecify)
 
     implementation(projects.fileCollections)
     implementation(projects.logging)
@@ -43,6 +43,7 @@ dependencies {
     testImplementation(projects.baseServicesGroovy)
     testImplementation(libs.jsoup)
     testImplementation(testFixtures(projects.core))
+    testImplementation(testFixtures(projects.jacoco))
 
     testRuntimeOnly(projects.distributionsCore) {
         because("ProjectBuilder tests load services from a Gradle distribution.")

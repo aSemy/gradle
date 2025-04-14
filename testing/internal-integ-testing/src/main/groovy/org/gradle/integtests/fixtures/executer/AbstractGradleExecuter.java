@@ -43,12 +43,13 @@ import org.gradle.internal.featurelifecycle.LoggingDeprecatedFeatureHandler;
 import org.gradle.internal.instrumentation.agent.AgentStatus;
 import org.gradle.internal.jvm.JavaHomeException;
 import org.gradle.internal.jvm.Jvm;
+import org.gradle.internal.jvm.SupportedJavaVersionsDeprecations;
 import org.gradle.internal.jvm.inspection.CachingJvmMetadataDetector;
 import org.gradle.internal.jvm.inspection.DefaultJvmMetadataDetector;
 import org.gradle.internal.jvm.inspection.DefaultJvmVersionDetector;
 import org.gradle.internal.jvm.inspection.JvmVersionDetector;
+import org.gradle.internal.logging.LoggingManagerFactory;
 import org.gradle.internal.logging.LoggingManagerInternal;
-import org.gradle.internal.logging.services.DefaultLoggingManagerFactory;
 import org.gradle.internal.logging.services.LoggingServiceRegistry;
 import org.gradle.internal.nativeintegration.console.TestOverrideConsoleDetector;
 import org.gradle.internal.nativeintegration.services.NativeServices;
@@ -203,6 +204,7 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
 
     protected boolean noExplicitNativeServicesDir;
     private boolean fullDeprecationStackTrace;
+    private boolean useInternalDeprecationStackTraceFlag = true;
     private boolean checkDeprecations = true;
     private boolean filterJavaVersionDeprecation = true;
     private boolean checkDaemonCrash = true;
@@ -385,6 +387,9 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
         if (fullDeprecationStackTrace) {
             executer.withFullDeprecationStackTraceEnabled();
         }
+        if (!useInternalDeprecationStackTraceFlag) {
+            executer.withoutInternalDeprecationStackTraceFlag();
+        }
         if (defaultLocale != null) {
             executer.withDefaultLocale(defaultLocale);
         }
@@ -421,10 +426,10 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
             executer.withGradleVersionOverride(gradleVersionOverride);
         }
 
-        if (debug.isEnabled()){
+        if (debug.isEnabled()) {
             executer.startBuildProcessInDebugger(opts -> debug.copyTo(opts));
         }
-        if (debugLauncher.isEnabled()){
+        if (debugLauncher.isEnabled()) {
             executer.startLauncherInDebugger(opts -> debugLauncher.copyTo(opts));
         }
 
@@ -601,6 +606,18 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
             gradleInvocation.implicitLauncherJvmArgs.add(debugLauncher.toDebugArgument());
         }
         gradleInvocation.implicitLauncherJvmArgs.add("-ea");
+
+        // Note: it's possible we shouldn't calculate _any_ implicit JVM args when requested to use only the specified ones, but to preserve behavior I only excluded the new flag here
+        if (useOnlyRequestedJvmOpts) {
+            return;
+        }
+
+        JavaVersion javaVersion = getJavaVersionFromJavaHome();
+        if (javaVersion.isCompatibleWith(JavaVersion.VERSION_24)) {
+            // Remove known warning that occurs in the launcher. This can be fixed by refactoring the bin/gradle start script to pass the flag or by adding the flag to the launcher JAR
+            // and refactoring the start script to use that JAR instead of a main class.
+            gradleInvocation.implicitLauncherJvmArgs.add("--enable-native-access=ALL-UNNAMED");
+        }
     }
 
     protected static String joinAndQuoteJvmArgs(List<String> buildJvmArgs) {
@@ -1199,7 +1216,9 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
         if (!noExplicitNativeServicesDir) {
             properties.put(NativeServices.NATIVE_DIR_OVERRIDE, buildContext.getNativeServicesDir().getAbsolutePath());
         }
-        properties.put(LoggingDeprecatedFeatureHandler.ORG_GRADLE_DEPRECATION_TRACE_PROPERTY_NAME, Boolean.toString(fullDeprecationStackTrace));
+        if (useInternalDeprecationStackTraceFlag) {
+            properties.put(LoggingDeprecatedFeatureHandler.ORG_GRADLE_DEPRECATION_TRACE_PROPERTY_NAME, Boolean.toString(fullDeprecationStackTrace));
+        }
 
         boolean useCustomGradleUserHomeDir = gradleUserHomeDir != null && !gradleUserHomeDir.equals(buildContext.getGradleUserHomeDir());
         if (useOwnUserHomeServices || useCustomGradleUserHomeDir) {
@@ -1380,14 +1399,9 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
 
         List<ExpectedDeprecationWarning> maybeExpectedDeprecationWarnings = new ArrayList<>();
         if (filterJavaVersionDeprecation) {
-            maybeExpectedDeprecationWarnings.add(ExpectedDeprecationWarning.withMessage(normalizeDocumentationLink(
-                "Executing Gradle on JVM versions 16 and lower has been deprecated. " +
-                    "This will fail with an error in Gradle 9.0. " +
-                    "Use JVM 17 or greater to execute Gradle. " +
-                    "Projects can continue to use older JVM versions via toolchains. " +
-                    "Consult the upgrading guide for further information: " +
-                    "https://docs.gradle.org/current/userguide/upgrading_version_8.html#minimum_daemon_jvm_version"
-            )));
+            maybeExpectedDeprecationWarnings.add(ExpectedDeprecationWarning.withMessage(
+                SupportedJavaVersionsDeprecations.getExpectedDaemonDeprecationWarning(getComputedGradleVersion())
+            ));
         }
 
         return new ResultAssertion(
@@ -1432,11 +1446,11 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
     }
 
     private String normalizeDocumentationLink(String warning) {
-        if (gradleVersionOverride != null) {
-            return DocumentationUtils.normalizeDocumentationLink(warning, gradleVersionOverride);
-        } else {
-            return DocumentationUtils.normalizeDocumentationLink(warning, gradleVersion);
-        }
+        return DocumentationUtils.normalizeDocumentationLink(warning, getComputedGradleVersion());
+    }
+
+    private GradleVersion getComputedGradleVersion() {
+        return gradleVersionOverride != null ? gradleVersionOverride : gradleVersion;
     }
 
     @Override
@@ -1542,6 +1556,12 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
     @Override
     public GradleExecuter withFullDeprecationStackTraceEnabled() {
         fullDeprecationStackTrace = true;
+        return this;
+    }
+
+    @Override
+    public GradleExecuter withoutInternalDeprecationStackTraceFlag() {
+        useInternalDeprecationStackTraceFlag = false;
         return this;
     }
 
@@ -1652,7 +1672,7 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
 
     private static ServiceRegistry newCommandLineProcessLogging() {
         ServiceRegistry loggingServices = LoggingServiceRegistry.newEmbeddableLogging();
-        LoggingManagerInternal rootLoggingManager = loggingServices.get(DefaultLoggingManagerFactory.class).getRoot();
+        LoggingManagerInternal rootLoggingManager = loggingServices.get(LoggingManagerFactory.class).getRoot();
         rootLoggingManager.attachSystemOutAndErr();
         return loggingServices;
     }

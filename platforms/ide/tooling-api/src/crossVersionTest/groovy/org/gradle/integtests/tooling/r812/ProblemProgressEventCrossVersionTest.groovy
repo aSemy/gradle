@@ -23,6 +23,7 @@ import org.gradle.integtests.tooling.fixture.TargetGradleVersion
 import org.gradle.integtests.tooling.fixture.ToolingApiSpecification
 import org.gradle.integtests.tooling.fixture.ToolingApiVersion
 import org.gradle.integtests.tooling.r85.CustomModel
+import org.gradle.test.fixtures.Flaky
 import org.gradle.test.fixtures.file.TestFile
 import org.gradle.test.precondition.Requires
 import org.gradle.test.preconditions.IntegTestPreconditions
@@ -64,14 +65,10 @@ class ProblemProgressEventCrossVersionTest extends ToolingApiSpecification {
     def "Failing executions produce problems"() {
         setup:
         buildFile """
-            plugins {
-              id 'java-library'
-            }
-            repositories.jcenter()
             task bar {}
             task baz {}
         """
-
+        settingsFile << 'rootProject.name = "root"'
 
         when:
         def listener = new ProblemProgressListener()
@@ -87,14 +84,8 @@ class ProblemProgressEventCrossVersionTest extends ToolingApiSpecification {
 
         then:
         thrown(BuildException)
-        listener.problems.size() == 2
-        verifyAll(listener.problems[0]) {
-            definition.id.displayName.contains("The RepositoryHandler.jcenter() method has been deprecated.")
-            definition.id.group.displayName in ["Deprecation", "deprecation", "repository-jcenter"]
-            definition.id.group.name in ["deprecation", "repository-jcenter", "deprecation-logger"]
-            definition.severity == Severity.WARNING
-            locations(it).find { l -> l instanceof LineInFileLocation && l.path == "build file '$buildFile.path'" } // FIXME: the path should not contain a prefix nor extra quotes
-        }
+        listener.problems.size() == 1
+        listener.problems[0].contextualLabel.contextualLabel == "Cannot locate tasks that match ':ba' as task 'ba' is ambiguous in root project 'root'. Candidates are: 'bar', 'baz'."
     }
 
     @TargetGradleVersion(">=8.9 <8.13")
@@ -172,6 +163,7 @@ class ProblemProgressEventCrossVersionTest extends ToolingApiSpecification {
         ''                         | null            | ''                                          | null
     }
 
+    @Flaky(because = "https://github.com/gradle/gradle-private/issues/4609")
     def "Can serialize groovy compilation error"() {
         buildFile """
             tasks.register("foo) {

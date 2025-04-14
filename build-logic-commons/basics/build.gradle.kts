@@ -28,4 +28,10 @@ dependencies {
     }
 
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.8.2")
+
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

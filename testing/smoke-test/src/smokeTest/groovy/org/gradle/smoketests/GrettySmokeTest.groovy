@@ -18,6 +18,8 @@ package org.gradle.smoketests
 
 import org.gradle.api.JavaVersion
 import org.gradle.integtests.fixtures.UnsupportedWithConfigurationCache
+import org.gradle.test.precondition.Requires
+import org.gradle.test.preconditions.UnitTestPreconditions
 import org.gradle.util.GradleVersion
 import org.gradle.util.internal.VersionNumber
 
@@ -27,6 +29,7 @@ import static org.gradle.testkit.runner.TaskOutcome.SUCCESS
 @UnsupportedWithConfigurationCache(
     because = "The Gretty plugin does not support configuration caching"
 )
+@Requires(UnitTestPreconditions.Jdk11OrLater)
 class GrettySmokeTest extends AbstractPluginValidatingSmokeTest {
 
     def 'run Jetty with Gretty #grettyConfig.version'() {
@@ -63,12 +66,9 @@ class GrettySmokeTest extends AbstractPluginValidatingSmokeTest {
 
         when:
         def result = runner('checkContainerUp')
-            .expectDeprecationWarning(
-                "The org.gradle.api.plugins.WarPluginConvention type has been deprecated. This is scheduled to be removed in Gradle 9.0. Consult the upgrading guide for further information: https://docs.gradle.org/${GradleVersion.current().version}/userguide/upgrading_version_8.html#war_convention_deprecation",
-                "https://github.com/gretty-gradle-plugin/gretty/issues/266")
             .expectDeprecationWarningIf(
                 grettyVersion < VersionNumber.parse("4.1.0"),
-                "The org.gradle.util.VersionNumber type has been deprecated. This is scheduled to be removed in Gradle 9.0. Consult the upgrading guide for further information: https://docs.gradle.org/${GradleVersion.current().version}/userguide/upgrading_version_8.html#org_gradle_util_reports_deprecations",
+                "The org.gradle.util.VersionNumber type has been deprecated. This is scheduled to be removed in Gradle 9.0. Consult the upgrading guide for further information: https://docs.gradle.org/${GradleVersion.current().version}/userguide/upgrading_version_8.html#org_gradle_util_reports_deprecations_8",
                 "https://github.com/gretty-gradle-plugin/gretty/issues/297"
             )
             .expectDeprecationWarning(

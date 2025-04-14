@@ -9,6 +9,7 @@ dependencies {
     api(projects.core)
     api(libs.kotlinStdlib)
 
+    implementation(projects.classloaders)
     implementation(projects.serviceLookup)
     implementation(projects.stdlibJavaExtensions)
     implementation(projects.time)
@@ -22,6 +23,8 @@ dependencies {
     implementation(projects.logging)
     implementation(projects.kotlinDslToolingModels)
     implementation(projects.buildProcessServices)
+
+    implementation(libs.jspecify)
 
     testImplementation(testFixtures(projects.kotlinDsl))
     integTestImplementation(testFixtures(projects.toolingApi))
