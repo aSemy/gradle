@@ -43,7 +43,7 @@ import org.gradle.internal.featurelifecycle.LoggingDeprecatedFeatureHandler;
 import org.gradle.internal.instrumentation.agent.AgentStatus;
 import org.gradle.internal.jvm.JavaHomeException;
 import org.gradle.internal.jvm.Jvm;
-import org.gradle.internal.jvm.SupportedJavaVersionsDeprecations;
+import org.gradle.internal.jvm.SupportedJavaVersionsExpectations;
 import org.gradle.internal.jvm.inspection.CachingJvmMetadataDetector;
 import org.gradle.internal.jvm.inspection.DefaultJvmMetadataDetector;
 import org.gradle.internal.jvm.inspection.DefaultJvmVersionDetector;
@@ -157,9 +157,7 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
     private File userHomeDir;
     private String javaHome;
     private Jvm jvm;
-    private File buildScript;
     private File projectDir;
-    private File settingsFile;
     private boolean ignoreMissingSettingsFile;
     private boolean ignoreCleanupAssertions;
     private PipedOutputStream stdinPipe;
@@ -246,8 +244,6 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
         initScripts.clear();
         workingDir = null;
         projectDir = null;
-        buildScript = null;
-        settingsFile = null;
         ignoreMissingSettingsFile = false;
         // ignoreCleanupAssertions is intentionally sticky
         // ignoreCleanupAssertions = false;
@@ -335,12 +331,6 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
         if (projectDir != null) {
             executer.usingProjectDirectory(projectDir);
         }
-        if (buildScript != null) {
-            executer.usingBuildScript(buildScript);
-        }
-        if (settingsFile != null) {
-            executer.usingSettingsFile(settingsFile);
-        }
         if (ignoreMissingSettingsFile) {
             executer.ignoreMissingSettingsFile();
         }
@@ -358,7 +348,7 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
         }
         executer.withTasks(tasks);
         executer.withArguments(args);
-        executer.withEnvironmentVars(environmentVars);
+        executer.withEnvironmentVarsIncludingJavaHome(environmentVars);
         executer.usingExecutable(executable);
         if (quiet) {
             executer.withQuietLogging();
@@ -480,22 +470,8 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
     }
 
     @Override
-    @Deprecated
-    public GradleExecuter usingBuildScript(File buildScript) {
-        this.buildScript = buildScript;
-        return this;
-    }
-
-    @Override
     public GradleExecuter usingProjectDirectory(File projectDir) {
         this.projectDir = projectDir;
-        return this;
-    }
-
-    @Override
-    @Deprecated
-    public GradleExecuter usingSettingsFile(File settingsFile) {
-        this.settingsFile = settingsFile;
         return this;
     }
 
@@ -806,6 +782,11 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
     @Override
     public final GradleExecuter withEnvironmentVars(Map<String, ?> environment) {
         Preconditions.checkArgument(!environment.containsKey("JAVA_HOME"), "Cannot provide JAVA_HOME to withEnvironmentVars, use withJavaHome instead");
+        return withEnvironmentVarsIncludingJavaHome(environment);
+    }
+
+    @Override
+    public GradleExecuter withEnvironmentVarsIncludingJavaHome(Map<String, ?> environment) {
         environmentVars.clear();
         for (Map.Entry<String, ?> entry : environment.entrySet()) {
             environmentVars.put(entry.getKey(), entry.getValue().toString());
@@ -1097,10 +1078,6 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
 
     protected List<String> getAllArgs() {
         List<String> allArgs = new ArrayList<>();
-        if (buildScript != null) {
-            allArgs.add("--build-file");
-            allArgs.add(buildScript.getAbsolutePath());
-        }
         if (projectDir != null) {
             allArgs.add("--project-dir");
             allArgs.add(projectDir.getAbsolutePath());
@@ -1108,10 +1085,6 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
         for (File initScript : initScripts) {
             allArgs.add("--init-script");
             allArgs.add(initScript.getAbsolutePath());
-        }
-        if (settingsFile != null) {
-            allArgs.add("--settings-file");
-            allArgs.add(settingsFile.getAbsolutePath());
         }
         if (quiet) {
             allArgs.add("--quiet");
@@ -1133,7 +1106,7 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
             allArgs.add("dependencies");
         }
 
-        if (settingsFile == null && !ignoreMissingSettingsFile) {
+        if (!ignoreMissingSettingsFile) {
             ensureSettingsFileAvailable();
         }
 
@@ -1229,9 +1202,7 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
                 tmpDir = getDefaultTmpDir();
             }
             String tmpDirPath = tmpDir.createDir().getAbsolutePath();
-            if (!tmpDirPath.contains(" ") || (getDistribution().isSupportsSpacesInGradleAndJavaOpts() && supportsWhiteSpaceInEnvVars())) {
-                properties.put("java.io.tmpdir", tmpDirPath);
-            }
+            properties.put("java.io.tmpdir", tmpDirPath);
         }
 
         if (!disablePluginRepositoryMirror) {
@@ -1266,10 +1237,6 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
         properties.put("org.gradle.kotlin.dsl.skipMetadataVersionCheck", "false");
 
         return properties;
-    }
-
-    protected boolean supportsWhiteSpaceInEnvVars() {
-        return true;
     }
 
     @Override
@@ -1400,7 +1367,7 @@ public abstract class AbstractGradleExecuter implements GradleExecuter, Resettab
         List<ExpectedDeprecationWarning> maybeExpectedDeprecationWarnings = new ArrayList<>();
         if (filterJavaVersionDeprecation) {
             maybeExpectedDeprecationWarnings.add(ExpectedDeprecationWarning.withMessage(
-                SupportedJavaVersionsDeprecations.getExpectedDaemonDeprecationWarning(getComputedGradleVersion())
+                SupportedJavaVersionsExpectations.getExpectedDaemonDeprecationWarning(getComputedGradleVersion())
             ));
         }
 

@@ -41,7 +41,7 @@ class KotlinDslPluginCrossVersionSmokeTest : AbstractKotlinIntegrationTest() {
 
     override val forceLocallyBuiltKotlinDslPlugins = false
 
-    private val oldestSupportedKotlinDslPluginVersion = "4.1.3"
+    private val oldestSupportedKotlinDslPluginVersion = "4.3.0"
 
     @Test
     @Requires(NotEmbeddedExecutor::class)
@@ -62,7 +62,7 @@ class KotlinDslPluginCrossVersionSmokeTest : AbstractKotlinIntegrationTest() {
         withDefaultSettings()
         withBuildScript("""plugins { id("some") }""")
 
-        expectConventionDeprecations()
+        expectConfigurationCacheRequestedDeprecation()
 
         build("help").apply {
 
@@ -111,7 +111,7 @@ class KotlinDslPluginCrossVersionSmokeTest : AbstractKotlinIntegrationTest() {
         withDefaultSettings().appendText("""includeBuild("producer")""")
         withBuildScript("""plugins { id("some") }""")
 
-        expectConventionDeprecations()
+        expectConfigurationCacheRequestedDeprecation()
         executer.expectDeprecationWarning("w: Language version 1.4 is deprecated and its support will be removed in a future version of Kotlin")
 
         build("help").apply {
@@ -138,12 +138,12 @@ class KotlinDslPluginCrossVersionSmokeTest : AbstractKotlinIntegrationTest() {
     }
 
     private
-    fun expectConventionDeprecations() {
+    fun expectConfigurationCacheRequestedDeprecation() {
         executer.expectDocumentedDeprecationWarning(
-            "The org.gradle.api.plugins.Convention type has been deprecated. " +
-                "This is scheduled to be removed in Gradle 9.0. " +
-                "Consult the upgrading guide for further information: " +
-                "https://docs.gradle.org/current/userguide/upgrading_version_8.html#deprecated_access_to_conventions"
+            "The StartParameter.isConfigurationCacheRequested property has been deprecated. " +
+                "This is scheduled to be removed in Gradle 10.0. " +
+                "Please use 'configurationCache.requested' property on 'BuildFeatures' service instead. Consult the upgrading guide for further information:" +
+                " https://docs.gradle.org/current/userguide/upgrading_version_8.html#deprecated_startparameter_is_configuration_cache_requested"
         )
     }
 }

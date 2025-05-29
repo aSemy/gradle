@@ -12,19 +12,18 @@ errorprone {
 }
 
 dependencies {
-    api(projects.concurrent)
-    api(projects.stdlibJavaExtensions)
-    api(projects.serialization)
-    api(projects.serviceProvider)
-    api(projects.buildOperations)
     api(projects.baseServices)
+    api(projects.buildOperations)
+    api(projects.buildState)
+    api(projects.concurrent)
     api(projects.core)
     api(projects.coreApi)
     api(projects.dependencyManagement)
     api(projects.messaging)
     api(projects.modelCore)
     api(projects.pluginUse)
-    api(projects.buildState)
+    api(projects.serviceProvider)
+    api(projects.stdlibJavaExtensions)
 
     api(libs.inject)
     api(libs.jspecify)
@@ -34,7 +33,6 @@ dependencies {
     implementation(projects.enterpriseLogging)
     implementation(projects.enterpriseOperations)
     implementation(projects.daemonServices)
-    implementation(projects.logging)
     implementation(projects.problemsApi)
     implementation(projects.serviceLookup)
     implementation(projects.functional)

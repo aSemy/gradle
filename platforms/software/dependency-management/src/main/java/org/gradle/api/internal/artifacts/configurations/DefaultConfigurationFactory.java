@@ -33,6 +33,7 @@ import org.gradle.api.internal.collections.DomainObjectCollectionFactory;
 import org.gradle.api.internal.file.FileCollectionFactory;
 import org.gradle.api.internal.project.ProjectStateRegistry;
 import org.gradle.api.internal.tasks.TaskDependencyFactory;
+import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.problems.internal.InternalProblems;
 import org.gradle.internal.Factory;
 import org.gradle.internal.code.UserCodeApplicationContext;
@@ -40,7 +41,6 @@ import org.gradle.internal.event.ListenerBroadcast;
 import org.gradle.internal.event.ListenerManager;
 import org.gradle.internal.model.CalculatedValueFactory;
 import org.gradle.internal.operations.BuildOperationRunner;
-import org.gradle.internal.reflect.Instantiator;
 import org.gradle.internal.service.scopes.Scope;
 import org.gradle.internal.service.scopes.ServiceScope;
 import org.gradle.internal.typeconversion.NotationParser;
@@ -55,7 +55,7 @@ import javax.inject.Inject;
 @ThreadSafe
 public class DefaultConfigurationFactory {
 
-    private final Instantiator instantiator;
+    private final ObjectFactory objectFactory;
     private final ConfigurationResolver resolver;
     private final ListenerManager listenerManager;
     private final DomainObjectContext domainObjectContext;
@@ -77,7 +77,7 @@ public class DefaultConfigurationFactory {
 
     @Inject
     public DefaultConfigurationFactory(
-        Instantiator instantiator,
+        ObjectFactory objectFactory,
         ConfigurationResolver resolver,
         ListenerManager listenerManager,
         DomainObjectContext domainObjectContext,
@@ -96,7 +96,7 @@ public class DefaultConfigurationFactory {
         InternalProblems problemsService,
         DocumentationRegistry documentationRegistry
     ) {
-        this.instantiator = instantiator;
+        this.objectFactory = objectFactory;
         this.resolver = resolver;
         this.listenerManager = listenerManager;
         this.domainObjectContext = domainObjectContext;
@@ -129,7 +129,7 @@ public class DefaultConfigurationFactory {
     ) {
         ListenerBroadcast<DependencyResolutionListener> dependencyResolutionListeners =
             listenerManager.createAnonymousBroadcaster(DependencyResolutionListener.class);
-        DefaultLegacyConfiguration instance = instantiator.newInstance(
+        return objectFactory.newInstance(
             DefaultLegacyConfiguration.class,
             domainObjectContext,
             name,
@@ -139,7 +139,6 @@ public class DefaultConfigurationFactory {
             resolutionStrategyFactory,
             fileCollectionFactory,
             buildOperationRunner,
-            instantiator,
             artifactNotationParser,
             capabilityNotationParser,
             attributesFactory,
@@ -157,8 +156,6 @@ public class DefaultConfigurationFactory {
             problemsService,
             documentationRegistry
         );
-        instance.addMutationValidator(rootComponentMetadataBuilder.getValidator());
-        return instance;
     }
 
     /**
@@ -172,7 +169,7 @@ public class DefaultConfigurationFactory {
     ) {
         ListenerBroadcast<DependencyResolutionListener> dependencyResolutionListeners =
             listenerManager.createAnonymousBroadcaster(DependencyResolutionListener.class);
-        DefaultResolvableConfiguration instance = instantiator.newInstance(
+        return objectFactory.newInstance(
             DefaultResolvableConfiguration.class,
             domainObjectContext,
             name,
@@ -182,7 +179,6 @@ public class DefaultConfigurationFactory {
             resolutionStrategyFactory,
             fileCollectionFactory,
             buildOperationRunner,
-            instantiator,
             artifactNotationParser,
             capabilityNotationParser,
             attributesFactory,
@@ -199,8 +195,6 @@ public class DefaultConfigurationFactory {
             problemsService,
             documentationRegistry
         );
-        instance.addMutationValidator(rootComponentMetadataBuilder.getValidator());
-        return instance;
     }
 
     /**
@@ -214,7 +208,7 @@ public class DefaultConfigurationFactory {
     ) {
         ListenerBroadcast<DependencyResolutionListener> dependencyResolutionListeners =
             listenerManager.createAnonymousBroadcaster(DependencyResolutionListener.class);
-        DefaultConsumableConfiguration instance = instantiator.newInstance(
+        return objectFactory.newInstance(
             DefaultConsumableConfiguration.class,
             domainObjectContext,
             name,
@@ -224,7 +218,6 @@ public class DefaultConfigurationFactory {
             resolutionStrategyFactory,
             fileCollectionFactory,
             buildOperationRunner,
-            instantiator,
             artifactNotationParser,
             capabilityNotationParser,
             attributesFactory,
@@ -241,8 +234,6 @@ public class DefaultConfigurationFactory {
             problemsService,
             documentationRegistry
         );
-        instance.addMutationValidator(rootComponentMetadataBuilder.getValidator());
-        return instance;
     }
 
     /**
@@ -256,7 +247,7 @@ public class DefaultConfigurationFactory {
     ) {
         ListenerBroadcast<DependencyResolutionListener> dependencyResolutionListeners =
             listenerManager.createAnonymousBroadcaster(DependencyResolutionListener.class);
-        DefaultDependencyScopeConfiguration instance = instantiator.newInstance(
+        return objectFactory.newInstance(
             DefaultDependencyScopeConfiguration.class,
             domainObjectContext,
             name,
@@ -266,7 +257,6 @@ public class DefaultConfigurationFactory {
             resolutionStrategyFactory,
             fileCollectionFactory,
             buildOperationRunner,
-            instantiator,
             artifactNotationParser,
             capabilityNotationParser,
             attributesFactory,
@@ -283,8 +273,6 @@ public class DefaultConfigurationFactory {
             problemsService,
             documentationRegistry
         );
-        instance.addMutationValidator(rootComponentMetadataBuilder.getValidator());
-        return instance;
     }
 
     public InternalProblems getProblems() {
