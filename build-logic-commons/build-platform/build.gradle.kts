@@ -65,15 +65,14 @@ dependencies {
         api("org.spockframework:spock-junit4:$spockVersion")
         api("org.asciidoctor:asciidoctorj:2.5.13")
         api("org.asciidoctor:asciidoctorj-api:2.5.13")
-        api("dev.adamko.dokkatoo:dokkatoo-plugin:2.3.1")
-        api("org.jetbrains.dokka:dokka-core:1.9.20")
+        api("org.jetbrains.dokka:dokka-gradle-plugin:2.0.0")
         api("com.fasterxml.woodstox:woodstox-core:6.4.0") {
             because("CVE-2022-40152 on lower versions")
         }
         api("com.beust:jcommander:1.78")
         api("$groovyGroup:groovy:$groovyVersion")
         api("org.codenarc:CodeNarc:$codenarcVersion")
-        api("org.eclipse.jgit:org.eclipse.jgit:5.13.3.202401111512-r")
+        api("org.eclipse.jgit:org.eclipse.jgit:7.2.1.202505142326-r")
         api("org.javassist:javassist:3.30.2-GA")
         api("org.jetbrains.kotlinx:kotlinx-metadata-jvm:0.9.0")
         api("org.jsoup:jsoup:1.15.3")
