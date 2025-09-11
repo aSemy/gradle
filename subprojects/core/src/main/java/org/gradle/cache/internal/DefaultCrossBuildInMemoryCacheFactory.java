@@ -212,7 +212,8 @@ public class DefaultCrossBuildInMemoryCacheFactory implements CrossBuildInMemory
                 case WEAK:
                     return synchronizedMap(new WeakHashMap<>());
                 case STRONG:
-                    return new ConcurrentHashMap<>();
+                    return synchronizedMap(new WeakHashMap<>());
+//                    return new ConcurrentHashMap<>();
             }
             throw new IllegalArgumentException("Unknown retention policy: " + retentionPolicy);
         }
