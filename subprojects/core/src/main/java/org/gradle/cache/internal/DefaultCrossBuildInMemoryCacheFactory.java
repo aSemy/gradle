@@ -200,8 +200,17 @@ public class DefaultCrossBuildInMemoryCacheFactory implements CrossBuildInMemory
     private static class DefaultCrossBuildInMemoryCache<K, V> extends AbstractCrossBuildInMemoryCache<K, V> {
 
         // This is used only to retain strong references to the values
-        private final Set<V> valuesForPreviousSession = new HashSet<>();
+//        private final Set<V> valuesForPreviousSession = new HashSet<>();
         private final Map<K, SoftReference<V>> allValues;
+
+        @Override
+        public void beforeComplete() {
+            super.beforeComplete();
+//            synchronized (valuesForPreviousSession) {
+//                valuesForPreviousSession.clear();
+//            }
+            allValues.clear();
+        }
 
         public DefaultCrossBuildInMemoryCache(KeyRetentionPolicy retentionPolicy) {
             this.allValues = mapFor(retentionPolicy);
@@ -221,17 +230,17 @@ public class DefaultCrossBuildInMemoryCacheFactory implements CrossBuildInMemory
         @Override
         protected void retainValuesFromCurrentSession(Stream<V> values) {
             // Retain strong references to the values created for this session
-            synchronized (valuesForPreviousSession) {
-                valuesForPreviousSession.clear();
-                values.forEach(valuesForPreviousSession::add);
-            }
+//            synchronized (valuesForPreviousSession) {
+//                valuesForPreviousSession.clear();
+////                values.forEach(valuesForPreviousSession::add);
+//            }
         }
 
         @Override
         protected void discardRetainedValues() {
-            synchronized (valuesForPreviousSession) {
-                valuesForPreviousSession.clear();
-            }
+//            synchronized (valuesForPreviousSession) {
+//                valuesForPreviousSession.clear();
+//            }
             allValues.clear();
         }
 
