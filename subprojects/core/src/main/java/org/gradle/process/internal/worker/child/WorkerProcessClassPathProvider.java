@@ -87,6 +87,7 @@ public class WorkerProcessClassPathProvider implements ClassPathProvider {
 
     @Override
     public ClassPath findClassPath(String name) {
+        System.out.println("WorkerProcessClassPathProvider.findClassPath: " + name);
         if (name.equals("WORKER_MAIN")) {
             synchronized (lock) {
                 if (workerClassPath == null) {
@@ -168,7 +169,7 @@ public class WorkerProcessClassPathProvider implements ClassPathProvider {
                 Spec.class,
                 JavaVersion.class,
                 JavaVersionParser.class);
-            Set<Class<?>> result = new HashSet<Class<?>>(classes);
+            Set<Class<?>> result = new HashSet<>(classes);
             for (Class<?> klass : classes) {
                 result.addAll(Arrays.asList(klass.getDeclaredClasses()));
             }

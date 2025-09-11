@@ -40,7 +40,7 @@ public class GroovySystemLoaderFactory {
         }
     }
 
-    private @Nullable Class<?> getGroovySystem(ClassLoader classLoader) {
+    private static @Nullable Class<?> getGroovySystem(ClassLoader classLoader) {
         try {
             return classLoader.loadClass("groovy.lang.GroovySystem");
         } catch (ClassNotFoundException e) {
@@ -48,12 +48,12 @@ public class GroovySystemLoaderFactory {
         }
     }
 
-    private GroovySystemLoader createClassInfoCleaningLoader(Class<?> groovySystem, ClassLoader classLoader) throws Exception {
+    private static GroovySystemLoader createClassInfoCleaningLoader(Class<?> groovySystem, ClassLoader classLoader) throws Exception {
         VersionNumber groovyVersion = getGroovyVersion(groovySystem);
         return isGroovy24OrLater(groovyVersion) ? new ClassInfoCleaningGroovySystemLoader(classLoader) : NO_OP;
     }
 
-    private @Nullable VersionNumber getGroovyVersion(Class<?> groovySystem) throws IllegalAccessException, InvocationTargetException {
+    private static @Nullable VersionNumber getGroovyVersion(Class<?> groovySystem) throws IllegalAccessException, InvocationTargetException {
         try {
             Method getVersion = groovySystem.getDeclaredMethod("getVersion");
             String versionString = (String) getVersion.invoke(null);
@@ -63,7 +63,7 @@ public class GroovySystemLoaderFactory {
         }
     }
 
-    private boolean isGroovy24OrLater(@Nullable VersionNumber groovyVersion) {
+    private static boolean isGroovy24OrLater(@Nullable VersionNumber groovyVersion) {
         if (groovyVersion == null) {
             return false;
         }

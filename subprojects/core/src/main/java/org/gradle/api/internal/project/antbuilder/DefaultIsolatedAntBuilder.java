@@ -24,7 +24,6 @@ import org.gradle.api.logging.LogLevel;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.internal.UncheckedException;
-import org.gradle.internal.classloader.CachingClassLoader;
 import org.gradle.internal.classloader.ClassLoaderFactory;
 import org.gradle.internal.classloader.ClassLoaderUtils;
 import org.gradle.internal.classloader.FilteringClassLoader;
@@ -83,7 +82,8 @@ public class DefaultIsolatedAntBuilder implements IsolatedAntBuilder, Stoppable 
         loggingLoaderSpec.allowClass(LogLevel.class);
         FilteringClassLoader loggingLoader = new FilteringClassLoader(getClass().getClassLoader(), loggingLoaderSpec);
 
-        this.baseAntLoader = new CachingClassLoader(new MultiParentClassLoader(antLoader, loggingLoader));
+        this.baseAntLoader = new MultiParentClassLoader(antLoader, loggingLoader);
+//        this.baseAntLoader = new CachingClassLoader(new MultiParentClassLoader(antLoader, loggingLoader));
 
         // Need gradle core to pick up ant logging adapter, AntBuilder and such
         ClassPath gradleCoreUrls = moduleRegistry.getModule("gradle-core-api").getImplementationClasspath();

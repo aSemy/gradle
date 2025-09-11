@@ -281,7 +281,7 @@ public class ManagedProxyClassGenerator extends AbstractProxyClassGenerator {
     }
 
     private void declareClass(ClassVisitor visitor, Collection<String> interfaceInternalNames, Type generatedType, Type superclassType) {
-        visitor.visit(V1_6, ACC_PUBLIC, generatedType.getInternalName(), null,
+        visitor.visit(V1_6, ACC_PUBLIC | ACC_STATIC, generatedType.getInternalName(), null,
             superclassType.getInternalName(), Iterables.toArray(interfaceInternalNames, String.class));
     }
 

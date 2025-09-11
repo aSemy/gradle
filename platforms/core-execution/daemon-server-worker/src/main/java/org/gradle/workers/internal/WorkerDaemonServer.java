@@ -80,7 +80,7 @@ public class WorkerDaemonServer implements RequestHandler<TransportableActionExe
     private final LegacyTypesSupport legacyTypesSupport;
     private final ActionExecutionSpecFactory actionExecutionSpecFactory;
     private final InstantiatorFactory instantiatorFactory;
-    private ClassLoader workerClassLoader;
+//    private ClassLoader workerClassLoader;
 
     @Inject
     public WorkerDaemonServer(ServiceRegistry parentServices, RequestArgumentSerializers argumentSerializers) {
@@ -117,15 +117,17 @@ public class WorkerDaemonServer implements RequestHandler<TransportableActionExe
         if (classLoaderStructure instanceof FlatClassLoaderStructure) {
             return new FlatClassLoaderWorker(this.getClass().getClassLoader(), workServices, actionExecutionSpecFactory, instantiatorFactory);
         } else {
-            return new IsolatedClassloaderWorker(getWorkerClassLoader(classLoaderStructure), workServices, actionExecutionSpecFactory, instantiatorFactory, true);
+            System.out.println("Using isolated classloader worker");
+            return new IsolatedClassloaderWorker(getWorkerClassLoader(classLoaderStructure), workServices, actionExecutionSpecFactory, instantiatorFactory);
         }
     }
 
     private ClassLoader getWorkerClassLoader(ClassLoaderStructure classLoaderStructure) {
-        if (workerClassLoader == null) {
-            this.workerClassLoader = IsolatedClassloaderWorker.createIsolatedWorkerClassloader(classLoaderStructure, this.getClass().getClassLoader(), legacyTypesSupport);
-        }
-        return workerClassLoader;
+        return IsolatedClassloaderWorker.createIsolatedWorkerClassloader(classLoaderStructure, this.getClass().getClassLoader(), legacyTypesSupport);
+//        if (workerClassLoader == null) {
+//            this.workerClassLoader = IsolatedClassloaderWorker.createIsolatedWorkerClassloader(classLoaderStructure, this.getClass().getClassLoader(), legacyTypesSupport);
+//        }
+//        return workerClassLoader;
     }
 
     @Override

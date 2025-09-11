@@ -23,7 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class DefaultClassPathRegistry implements ClassPathRegistry {
-    private final List<ClassPathProvider> providers = new ArrayList<ClassPathProvider>();
+    private final List<ClassPathProvider> providers = new ArrayList<>();
 
     public DefaultClassPathRegistry(ClassPathProvider... providers) {
         this.providers.addAll(Arrays.asList(providers));
@@ -31,6 +31,7 @@ public class DefaultClassPathRegistry implements ClassPathRegistry {
 
     @Override
     public ClassPath getClassPath(String name) {
+        System.out.println("ClassPathRegistry.getClassPath(" + name + ")");
         for (ClassPathProvider provider : providers) {
             ClassPath classpath = provider.findClassPath(name);
             if (classpath != null) {

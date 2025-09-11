@@ -26,13 +26,13 @@ import org.gradle.internal.UncheckedException;
  * Instead, this class allows to record the exception and rethrow it after class loading is mostly done.
  * The suggested pattern is to override the {@link ClassLoader#findClass(String)}:
  * <pre>
- * <code>
+ * {@code
  *
  * private final TransformErrorHandler handler = new TransformErrorHandler("loader-name")
  *
- * protected Class&lt;?&gt; findClass(String name) throws ClassNotFoundException {
+ * protected Class<?> findClass(String name) throws ClassNotFoundException {
  *     handler.enterClassLoadingScope(name);
- *     Class&lt;?&gt; result;
+ *     Class<?> result;
  *     try {
  *         result = super.findClass(name);
  *     } catch (Throwable th) {
@@ -45,14 +45,14 @@ import org.gradle.internal.UncheckedException;
  * public void transformFailed(String className, Throwable th) {
  *     handler.classLoadingError(className, th);
  * }
- * </code>
+ * }
  * </pre>
  * <p>
  * This class is thread-safe, though it only tracks pending exceptions per-thread.
  */
 public class TransformErrorHandler {
     @SuppressWarnings("ThreadLocalUsage")
-    private final ThreadLocal<ClassNotFoundException> lastError = new ThreadLocal<ClassNotFoundException>();
+    private final ThreadLocal<@Nullable ClassNotFoundException> lastError = new ThreadLocal<>();
     private final String classLoaderName;
 
     public TransformErrorHandler(String classLoaderName) {

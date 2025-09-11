@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 public class VisitableURLClassLoader extends URLClassLoader implements ClassLoaderHierarchy {
     static {
@@ -43,7 +44,13 @@ public class VisitableURLClassLoader extends URLClassLoader implements ClassLoad
         }
     }
 
-    private final Map<Object, Object> userData = new HashMap<Object, Object>();
+    private final WeakHashMap<Object, Object> userData = new WeakHashMap<Object, Object>();
+
+    @Override
+    public void close() throws IOException {
+        super.close();
+        userData.clear();
+    }
 
     /**
      * This method can be used to store user data that should live among with this classloader

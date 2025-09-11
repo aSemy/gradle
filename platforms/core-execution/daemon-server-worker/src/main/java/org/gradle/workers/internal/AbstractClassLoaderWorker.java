@@ -41,7 +41,9 @@ public abstract class AbstractClassLoaderWorker implements RequestHandler<Transp
             workServices,
             instantiatorFactory,
             new IsolationScheme<>(Cast.uncheckedCast(WorkAction.class), WorkParameters.class, WorkParameters.None.class),
-            Collections.singletonList(IsolatedAntBuilder.class));
+            Collections.emptyList()
+        );
+//            Collections.singletonList(IsolatedAntBuilder.class));
     }
 
     public DefaultWorkResult executeInClassLoader(TransportableActionExecutionSpec spec, ClassLoader workerClassLoader) {

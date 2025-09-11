@@ -1,3 +1,5 @@
+gradle-tmp/
+
 # Gradle
 # ------
 .gradle

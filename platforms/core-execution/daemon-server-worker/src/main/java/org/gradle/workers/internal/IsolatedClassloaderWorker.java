@@ -30,17 +30,17 @@ import org.gradle.internal.service.ServiceRegistry;
 public class IsolatedClassloaderWorker extends AbstractClassLoaderWorker {
     private final GroovySystemLoaderFactory groovySystemLoaderFactory = new GroovySystemLoaderFactory();
     private ClassLoader workerClassLoader;
-    private boolean reuseClassloader;
+//    private boolean reuseClassloader;
 
     public IsolatedClassloaderWorker(ClassLoader workerClassLoader, ServiceRegistry workServices, ActionExecutionSpecFactory actionExecutionSpecFactory, InstantiatorFactory instantiatorFactory) {
         super(workServices, actionExecutionSpecFactory, instantiatorFactory);
         this.workerClassLoader = workerClassLoader;
     }
 
-    public IsolatedClassloaderWorker(ClassLoader workerClassLoader, ServiceRegistry workServices, ActionExecutionSpecFactory actionExecutionSpecFactory, InstantiatorFactory instantiatorFactory, boolean reuseClassloader) {
-        this(workerClassLoader, workServices, actionExecutionSpecFactory, instantiatorFactory);
-        this.reuseClassloader = reuseClassloader;
-    }
+//    public IsolatedClassloaderWorker(ClassLoader workerClassLoader, ServiceRegistry workServices, ActionExecutionSpecFactory actionExecutionSpecFactory, InstantiatorFactory instantiatorFactory, boolean reuseClassloader) {
+//        this(workerClassLoader, workServices, actionExecutionSpecFactory, instantiatorFactory);
+//        this.reuseClassloader = reuseClassloader;
+//    }
 
     @Override
     public DefaultWorkResult run(TransportableActionExecutionSpec spec) {
@@ -48,12 +48,24 @@ public class IsolatedClassloaderWorker extends AbstractClassLoaderWorker {
         try {
             return executeInClassLoader(spec, workerClassLoader);
         } finally {
+            workerClasspathGroovy.discardTypesFrom(workerClassLoader);
             workerClasspathGroovy.shutdown();
             // TODO: we should just cache these classloaders and eject/stop them when they are no longer in use
-            if (!reuseClassloader) {
-                CompositeStoppable.stoppable(workerClassLoader).stop();
-                this.workerClassLoader = null;
-            }
+//            if (!reuseClassloader) {
+            CompositeStoppable.stoppable(workerClassLoader).stop();
+//            if (workerClassLoader instanceof URLClassLoader) {
+//                final URLClassLoader f = (URLClassLoader) workerClassLoader;
+//                try {
+//                    System.out.println("Stopping worker classloader " + f + "...");
+//                    f.close();
+//                    System.out.println("Stopped worker classloader " + f + "!");
+//                } catch (Exception e) {
+////                    throw new RuntimeException(e);
+//                }
+//            }
+            this.workerClassLoader = null;
+            System.out.println("Stopped worker classloader");
+//            }
         }
     }
 
@@ -73,19 +85,23 @@ public class IsolatedClassloaderWorker extends AbstractClassLoaderWorker {
     }
 
     private static ClassLoader createClassLoaderFromSpec(ClassLoader parent, ClassLoaderSpec spec, LegacyTypesSupport legacyTypesSupport) {
+        System.out.println("IsolatedClassloaderWorker createClassLoaderFromSpec" + " parent:" + parent.toString() + " spec:" + spec.getClass().getName());
         if (spec instanceof MixInLegacyTypesClassLoader.Spec) {
+            System.out.println("IsolatedClassloaderWorker createClassLoaderFromSpec spec MixInLegacyTypesClassLoader");
             MixInLegacyTypesClassLoader.Spec mixinSpec = (MixInLegacyTypesClassLoader.Spec) spec;
             if (mixinSpec.getClasspath().isEmpty()) {
                 return parent;
             }
             return new MixInLegacyTypesClassLoader(parent, mixinSpec.getClasspath(), legacyTypesSupport);
         } else if (spec instanceof VisitableURLClassLoader.Spec) {
+            System.out.println("IsolatedClassloaderWorker createClassLoaderFromSpec spec VisitableURLClassLoader");
             VisitableURLClassLoader.Spec visitableSpec = (VisitableURLClassLoader.Spec) spec;
             if (visitableSpec.getClasspath().isEmpty()) {
                 return parent;
             }
             return new VisitableURLClassLoader(visitableSpec.getName(), parent, visitableSpec.getClasspath());
         } else if (spec instanceof FilteringClassLoader.Spec) {
+            System.out.println("IsolatedClassloaderWorker createClassLoaderFromSpec spec FilteringClassLoader");
             FilteringClassLoader.Spec filteringSpec = (FilteringClassLoader.Spec) spec;
             if (filteringSpec.isEmpty()) {
                 return parent;
