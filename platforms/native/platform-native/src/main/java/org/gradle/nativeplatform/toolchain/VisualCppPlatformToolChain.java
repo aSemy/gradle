@@ -25,8 +25,16 @@ import org.gradle.api.Incubating;
 public interface VisualCppPlatformToolChain extends NativePlatformToolChain {
     /**
      * Returns the settings to use for the C compiler.
+     *
+     * @deprecated Renamed. Use {@link #getCCompiler()} instead.
      */
+    @Deprecated
     CommandLineToolConfiguration getcCompiler();
+
+    /**
+     * Returns the settings to use for the C compiler.
+     */
+    CommandLineToolConfiguration getCCompiler();
 
     /**
      * Returns the settings to use for the C++ compiler.

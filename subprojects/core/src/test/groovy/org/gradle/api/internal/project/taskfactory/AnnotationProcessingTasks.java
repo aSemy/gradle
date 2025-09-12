@@ -631,7 +631,7 @@ public class AnnotationProcessingTasks {
         }
 
         @Input
-        public String getcCompiler() {
+        public String getCCompiler() {
             return cCompiler;
         }
 

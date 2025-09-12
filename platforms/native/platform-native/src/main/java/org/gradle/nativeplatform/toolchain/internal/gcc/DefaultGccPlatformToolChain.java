@@ -82,7 +82,7 @@ public class DefaultGccPlatformToolChain implements GccPlatformToolChain, ToolRe
     }
 
     @Override
-    public GccCommandLineToolConfigurationInternal getcCompiler() {
+    public GccCommandLineToolConfigurationInternal getCCompiler() {
         return tools.get(ToolType.C_COMPILER);
     }
 

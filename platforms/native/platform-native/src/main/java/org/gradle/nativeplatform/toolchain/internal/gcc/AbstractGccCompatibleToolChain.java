@@ -288,7 +288,7 @@ public abstract class AbstractGccCompatibleToolChain extends ExtendableToolChain
                 }
             };
             gccToolChain.getCppCompiler().withArguments(m32args);
-            gccToolChain.getcCompiler().withArguments(m32args);
+            gccToolChain.getCCompiler().withArguments(m32args);
             gccToolChain.getObjcCompiler().withArguments(m32args);
             gccToolChain.getObjcppCompiler().withArguments(m32args);
             gccToolChain.getLinker().withArguments(m32args);
@@ -322,7 +322,7 @@ public abstract class AbstractGccCompatibleToolChain extends ExtendableToolChain
                 }
             };
             gccToolChain.getCppCompiler().withArguments(m64args);
-            gccToolChain.getcCompiler().withArguments(m64args);
+            gccToolChain.getCCompiler().withArguments(m64args);
             gccToolChain.getObjcCompiler().withArguments(m64args);
             gccToolChain.getObjcppCompiler().withArguments(m64args);
             gccToolChain.getLinker().withArguments(m64args);
@@ -355,7 +355,7 @@ public abstract class AbstractGccCompatibleToolChain extends ExtendableToolChain
                 }
             };
             gccToolChain.getCppCompiler().withArguments(architectureArgs);
-            gccToolChain.getcCompiler().withArguments(architectureArgs);
+            gccToolChain.getCCompiler().withArguments(architectureArgs);
             gccToolChain.getObjcCompiler().withArguments(architectureArgs);
             gccToolChain.getObjcppCompiler().withArguments(architectureArgs);
             gccToolChain.getLinker().withArguments(architectureArgs);

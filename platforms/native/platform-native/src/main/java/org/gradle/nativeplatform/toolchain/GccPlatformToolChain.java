@@ -17,16 +17,28 @@
 package org.gradle.nativeplatform.toolchain;
 
 import org.gradle.api.Incubating;
+import org.gradle.nativeplatform.toolchain.internal.GroovyName;
 
 /**
  * GCC specific settings for the tools used to build for a particular platform.
  */
 @Incubating
 public interface GccPlatformToolChain extends NativePlatformToolChain {
+//    /**
+//     * Returns the settings to use for the C compiler.
+//     *
+//     * x@deprecated Use {@link #getCCompiler()} instead.
+//     */
+////    @Deprecated
+//    default GccCommandLineToolConfiguration getcCompiler() {
+//        return getCCompiler();
+//    }
+
     /**
      * Returns the settings to use for the C compiler.
      */
-    GccCommandLineToolConfiguration getcCompiler();
+    @GroovyName("cCompiler")
+    GccCommandLineToolConfiguration getCCompiler();
 
     /**
      * Returns the settings to use for the C++ compiler.

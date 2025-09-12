@@ -43,7 +43,13 @@ public class DefaultVisualCppPlatformToolChain implements VisualCppPlatformToolC
     }
 
     @Override
+    @Deprecated
     public CommandLineToolConfiguration getcCompiler() {
+        return getCCompiler();
+    }
+
+    @Override
+    public CommandLineToolConfiguration getCCompiler() {
         return tools.get(ToolType.C_COMPILER);
     }
 

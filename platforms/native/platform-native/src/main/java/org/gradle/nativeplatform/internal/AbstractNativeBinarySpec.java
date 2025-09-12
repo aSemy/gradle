@@ -63,13 +63,13 @@ public abstract class AbstractNativeBinarySpec extends BaseBinarySpec implements
     private final PreprocessingTool objcppCompiler = new DefaultPreprocessingTool();
     private final PreprocessingTool rcCompiler = new DefaultPreprocessingTool();
     private final Map<String, Tool> toolsByName = ImmutableMap.<String, Tool>builder()
-            .put("assembler", assembler)
-            .put("cCompiler", cCompiler)
-            .put("cppCompiler", cppCompiler)
-            .put("objcCompiler", objcCompiler)
-            .put("objcppCompiler", objcppCompiler)
-            .put("rcCompiler", rcCompiler)
-            .build();
+        .put("assembler", assembler)
+        .put("cCompiler", cCompiler)
+        .put("cppCompiler", cppCompiler)
+        .put("objcCompiler", objcCompiler)
+        .put("objcppCompiler", objcppCompiler)
+        .put("rcCompiler", rcCompiler)
+        .build();
 
     private PlatformToolProvider toolProvider;
     private Flavor flavor;
@@ -146,7 +146,13 @@ public abstract class AbstractNativeBinarySpec extends BaseBinarySpec implements
     }
 
     @Override
+    @Deprecated
     public PreprocessingTool getcCompiler() {
+        return getCCompiler();
+    }
+
+    @Override
+    public PreprocessingTool getCCompiler() {
         return cCompiler;
     }
 
@@ -208,7 +214,7 @@ public abstract class AbstractNativeBinarySpec extends BaseBinarySpec implements
     @Override
     public void addPreCompiledHeaderFor(DependentSourceSet sourceSet) {
         prefixFileToPCH.put(
-            ((DependentSourceSetInternal)sourceSet).getPrefixHeaderFile(),
+            ((DependentSourceSetInternal) sourceSet).getPrefixHeaderFile(),
             new PreCompiledHeader(getIdentifier().child("pch")));
     }
 

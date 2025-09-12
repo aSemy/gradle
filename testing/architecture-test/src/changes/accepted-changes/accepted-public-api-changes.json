@@ -73,6 +73,30 @@
             ]
         },
         {
+            "type": "org.gradle.nativeplatform.NativeBinarySpec",
+            "member": "Method org.gradle.nativeplatform.NativeBinarySpec.getCCompiler()",
+            "acceptation": "Renamed to fix typo",
+            "changes": [
+                "Method added to interface"
+            ]
+        },
+        {
+            "type": "org.gradle.nativeplatform.toolchain.GccPlatformToolChain",
+            "member": "Method org.gradle.nativeplatform.toolchain.GccPlatformToolChain.getCCompiler()",
+            "acceptation": "Renamed to fix typo",
+            "changes": [
+                "Method added to interface"
+            ]
+        },
+        {
+            "type": "org.gradle.nativeplatform.toolchain.VisualCppPlatformToolChain",
+            "member": "Method org.gradle.nativeplatform.toolchain.VisualCppPlatformToolChain.getCCompiler()",
+            "acceptation": "Renamed to fix typo",
+            "changes": [
+                "Method added to interface"
+            ]
+        },
+        {
             "type": "org.gradle.plugin.devel.tasks.PluginUnderTestMetadata",
             "member": "Method org.gradle.plugin.devel.tasks.PluginUnderTestMetadata.getOutputDirectory()",
             "acceptation": "Replaced with abstract getter",
