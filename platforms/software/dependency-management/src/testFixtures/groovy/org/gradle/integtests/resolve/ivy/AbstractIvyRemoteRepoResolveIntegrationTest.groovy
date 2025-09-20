@@ -23,6 +23,13 @@ import org.gradle.test.fixtures.file.LeaksFileHandles
 import org.gradle.test.fixtures.server.RepositoryServer
 import org.junit.Rule
 
+import org.apache.commons.lang3.StringUtils
+import org.gradle.test.fixtures.GradleModuleMetadata
+import org.gradle.test.fixtures.file.TestFile
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.stream.Stream
+
 @LeaksFileHandles
 abstract class AbstractIvyRemoteRepoResolveIntegrationTest extends AbstractIntegrationSpec {
 
@@ -430,5 +437,176 @@ abstract class AbstractIvyRemoteRepoResolveIntegrationTest extends AbstractInteg
 
         then:
         file('libs').assertHasDescendants('projectA-1.2.jar', 'projectB-1.6.jar')
+    }
+
+    def "custom layout"() {
+        given:
+
+        def demoMavenRepoDir = file("demo-maven-repo")
+
+        buildKotlinFile << """
+        """
+        settingsKotlinFile << """
+            rootProject.name = "custom-repo-layout-demo"
+            includeBuild("demo-lib")
+            includeBuild("demo-app")
+        """
+
+        file("demo-lib/build.gradle.kts") << """
+            plugins {
+              `java-library`
+              `maven-publish`
+            }
+
+            group = "a.b.c.group"
+            version = "1.2.3"
+
+            java {
+              withSourcesJar()
+              withJavadocJar()
+            }
+
+            publishing {
+              publications {
+                create<MavenPublication>("maven") {
+                  from(components["java"])
+                }
+              }
+              repositories {
+                maven(layout.buildDirectory.dir("build-dir-maven-repo") {
+                  name = "BuildDirMaven"
+                }
+              }
+            }
+        """
+
+        file("demo-lib/settings.gradle.kts") << """
+            rootProject.name = "demo-lib"
+
+            pluginManagement {
+              repositories {
+                mavenCentral()
+                gradlePluginPortal()
+              }
+            }
+
+            @Suppress("UnstableApiUsage")
+            dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+
+              repositories {
+                mavenCentral()
+              }
+            }
+        """
+
+        file("demo-lib/src/main/java/DemoLib.java") << """
+            public class DemoLib {
+              public String getGreeting() {
+                return "Hello World!";
+              }
+            }
+        """
+
+        file("demo-app/build.gradle.kts") << """
+            plugins {
+              java
+            }
+
+            dependencies {
+              implementation("a.b.c.group:demo-lib:1.2.3")
+            }
+        """
+        file("demo-app/settings.gradle.kts") << """
+            rootProject.name = "demo-app"
+
+            pluginManagement {
+              repositories {
+                mavenCentral()
+                gradlePluginPortal()
+              }
+            }
+
+            @Suppress("UnstableApiUsage")
+            dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+
+              repositories {
+                mavenCentral()
+
+                ivy(file("${demoMavenRepoDir.absolutePath}")) {
+                  name = "DemoMavenRepoDir"
+                  patternLayout {
+                    setM2compatible(true)
+                    artifact("[organisation]/releases/download/v[revision]/[module]-[revision](-[classifier]).[ext]")
+                  }
+                  metadataSources {
+                    gradleMetadata()
+                  }
+                }
+              }
+            }
+        """
+
+        file("demo-app/src/main/java/DemoApp.java") << """
+            public class DemoApp {
+              public static void main(String[] args) {
+                System.out.println(new DemoLib().getGreeting());
+              }
+            }
+        """
+
+        then:
+        succeeds("-p demo-lib", "publishToBuildDirMavenRepo")
+
+        when:
+        Path demoLibMavenDir = file("demo-lib/build/build-dir-maven-repo").toPath()
+        Path demoMavenRepoDirSubDir = demoMavenRepoDir.toPath()
+            .resolve("a/b/c/group")
+            .resolve("releases/download")
+            .resolve("v1.2.3")
+
+        Stream<Path> moduleMetadataFiles = Files.walk(demoLibMavenDir)
+            .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".module") }
+//            .collect(Collectors.toList())
+
+        Stream<Path> filesToCopy =
+            moduleMetadataFiles
+//                .stream()
+                .flatMap { Files.list(it.parent) }
+                .filter { Files.isRegularFile(it) }
+//                .collect(Collectors.toList())
+
+        filesToCopy
+            .forEach { f ->
+                Files.copy(f, demoMavenRepoDirSubDir.resolve(f.fileName.toString()))
+            }
+
+        Files.walk(demoMavenRepoDirSubDir)
+            .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".module") }
+            .forEach { f ->
+                GradleModuleMetadata gmm = new GradleModuleMetadata(new TestFile(f.toFile()))
+
+                // re-write the module-metadata so it's in the same dir
+                if (gmm.component.url?.startsWith("../../") == true) {
+                    gmm.component.url = StringUtils.substringAfterLast(gmm.component.url, "/")
+                }
+
+                // re-write variants - they're in the same dir
+//                moduleMetadata.variants.forEach { variant ->
+//                    variant.availableAt?.let { aa ->
+//                        if (aa.url.startsWith("../../")) {
+//                            aa.url = aa.url.substringAfterLast("/")
+//                        }
+//                    }
+//                }
+
+                // save the updated GMM
+//                moduleFile.outputStream().use { sink ->
+//                    json.encodeToStream(MutableGradleModuleMetadata.serializer(), moduleMetadata, sink)
+//                }
+            }
+
+        def gmmFile = file("build/repo/com/acme/root/1.3/root-1.3.module")
     }
 }
