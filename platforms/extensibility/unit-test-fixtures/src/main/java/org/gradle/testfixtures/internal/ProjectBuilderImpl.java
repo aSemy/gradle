@@ -113,7 +113,7 @@ public class ProjectBuilderImpl {
         parentDescriptor.addChild(descriptor.getIdentity());
 
         ProjectState projectState = parentProject.getServices().get(ProjectStateRegistry.class).registerProject(parentProject.getServices().get(BuildState.class), descriptor);
-        projectState.createMutableModel(parentProject.getClassLoaderScope().createChild("project-" + name, null), parentProject.getBaseClassLoaderScope());
+        projectState.createMutableModel(parentProject.getClassLoaderScope().createChild("project[" + projectState.getIdentityPath() + "]", null), parentProject.getBaseClassLoaderScope());
         ProjectInternal project = projectState.getMutableModel();
 
         // Lock the project, these won't ever be released as ProjectBuilder has no lifecycle

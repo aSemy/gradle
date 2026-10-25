@@ -46,8 +46,8 @@ public class InstantiatingBuildLoader implements BuildLoader {
 
     private void createChildProjectsRecursively(BuildState owner, ProjectDescriptorInternal parentProjectDescriptor, ClassLoaderScope parentProjectClassLoaderScope, ClassLoaderScope baseProjectClassLoaderScope) {
         for (ProjectDescriptorInternal childProjectDescriptor : parentProjectDescriptor.children()) {
-            ClassLoaderScope childProjectClassLoaderScope = parentProjectClassLoaderScope.createChild("project-" + childProjectDescriptor.getName(), null);
             ProjectState projectState = owner.getProjects().getProject(childProjectDescriptor.path());
+            ClassLoaderScope childProjectClassLoaderScope = parentProjectClassLoaderScope.createChild("project[" + projectState.getIdentityPath() + "]", null);
             projectState.createMutableModel(childProjectClassLoaderScope, baseProjectClassLoaderScope);
             createChildProjectsRecursively(owner, childProjectDescriptor, childProjectClassLoaderScope, baseProjectClassLoaderScope);
         }

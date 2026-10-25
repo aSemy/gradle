@@ -23,6 +23,9 @@ import org.gradle.util.internal.TextUtil
 
 class AlreadyOnClasspathPluginUseIntegrationTest extends AbstractIntegrationSpec {
 
+    private static final String REMOVE_VERSION_RESOLUTION =
+        "Remove the version from this request. For a version catalog alias, request the plugin by id instead."
+
     def operations = new BuildOperationsFixture(executer, temporaryFolder)
 
     def setup() {
@@ -249,7 +252,8 @@ class AlreadyOnClasspathPluginUseIntegrationTest extends AbstractIntegrationSpec
 
         then:
         failureDescriptionStartsWith("Error resolving plugin [id: 'my-plugin', version: '1.0.1']")
-        failureHasCause("The request for this plugin could not be satisfied because the plugin is already on the classpath with a different version (1.0).")
+        failureHasCause("Plugin 'my-plugin' version '1.0.1' was requested, but version '1.0' of the plugin is already on the classpath of the root project.")
+        failure.assertHasResolution(REMOVE_VERSION_RESOLUTION)
 
         and:
         operations.hasOperation("Apply plugin my-plugin to root project 'root'")
@@ -310,6 +314,71 @@ class AlreadyOnClasspathPluginUseIntegrationTest extends AbstractIntegrationSpec
         operations.hasOperation("Apply plugin my-plugin to root project 'root'")
     }
 
+    def "names the build when plugin on settings buildscript classpath is requested from buildSrc"() {
+
+        given:
+        withBinaryPluginPublishedLocally()
+
+        and:
+        withSettings """
+            buildscript {
+                ${withLocalPluginRepository()}
+                dependencies {
+                    classpath("com.acme:my-local-plugins:1.0")
+                }
+            }
+        """
+        file("buildSrc/build.gradle") << requestPlugin("my-plugin", "1.0")
+
+        when:
+        fails "help"
+
+        then:
+        failureHasCause("Plugin 'my-plugin' version '1.0' was requested, but the plugin is already on the classpath of the settings script of build ':', and Gradle cannot tell which version that is.")
+    }
+
+    // This is legal because the init script classpath is not a parent of the settings or project classpaths.
+    def "can request plugin version of plugin on init script classpath if the version differs"() {
+        given:
+        withBinaryPluginPublishedLocally()
+        withBinaryPluginPublishedLocally("my-other-local-plugins", "1.0.1")
+
+        and:
+        def initScript = file("init.gradle") << """
+            initscript {
+                repositories {
+                    maven {
+                        url = uri("${file(localPluginRepoPath).toURI()}")
+                    }
+                }
+                dependencies {
+                    classpath("com.acme:my-local-plugins:1.0")
+                }
+            }
+            println("init script loads my-plugin from " + my.MyPlugin.protectionDomain.codeSource.location)
+        """
+        args("-I", initScript.absolutePath)
+
+        and:
+        withSettings """
+            pluginManagement {
+                ${withLocalPluginRepository()}
+            }
+        """
+        buildFile << requestPlugin("my-plugin", "1.0.1")
+        buildFile << """
+            println("build script loads my-plugin from " + my.MyPlugin.protectionDomain.codeSource.location)
+        """
+
+        when:
+        succeeds "help"
+
+        then:
+        outputContains(appliedPluginOutput(":"))
+        output.find(/init script loads my-plugin from \S*my-local-plugins-1\.0\.jar/)
+        output.find(/build script loads my-plugin from \S*my-other-local-plugins-1\.0\.1\.jar/)
+    }
+
     def "cannot request plugin version of plugin already requested on parent project if the version differs (using settings)"() {
         given:
         withBinaryPluginPublishedLocally()
@@ -336,17 +405,70 @@ class AlreadyOnClasspathPluginUseIntegrationTest extends AbstractIntegrationSpec
 
         then:
         failureDescriptionStartsWith("Error resolving plugin [id: 'my-plugin', version: '1.0.1']")
-        failureHasCause("The request for this plugin could not be satisfied because the plugin is already on the classpath with a different version (1.0).")
+        failureHasCause("Plugin 'my-plugin' version '1.0.1' was requested, but version '1.0' of the plugin is already on the classpath of the root project.")
+        failure.assertHasResolution(REMOVE_VERSION_RESOLUTION)
 
         and:
         operations.hasOperation("Apply plugin my-plugin to root project 'root'")
         !operations.hasOperation("Apply plugin my-plugin to project ':a'")
     }
 
-    def "cannot request plugin version of plugin from 'buildSrc'"() {
-
+    def "cannot request plugin version of plugin from 'buildSrc' in #requestingScript"() {
         given:
         withBinaryPluginBuild("buildSrc")
+
+        and:
+        createDirs("a")
+        withSettings("include('a')")
+
+        and:
+        file(requestingScript) << requestPlugin("my-plugin", "1.0")
+
+        when:
+        fails "help"
+
+        then:
+        failureDescriptionStartsWith("Error resolving plugin [id: 'my-plugin', version: '1.0']")
+        failureHasCause("Plugin 'my-plugin' version '1.0' was requested, but the plugin is already on the classpath of buildSrc, and Gradle cannot tell which version that is.")
+        failure.assertHasResolution(REMOVE_VERSION_RESOLUTION)
+
+        where:
+        requestingScript << ["build.gradle", "a/build.gradle"]
+    }
+
+    def "cannot request plugin version of plugin from 'buildSrc' whose class cannot be loaded"() {
+
+        given:
+        // The superclass is only available at compile time, so loading the plugin class fails with NoClassDefFoundError
+        file("buildSrc/src/main/groovy/my/MyPlugin.groovy") << """
+            package my
+
+            import org.gradle.api.*
+
+            abstract class MyPlugin extends junit.framework.TestCase implements Plugin<Project> {
+            }
+        """.stripIndent()
+        file("buildSrc/build.gradle") << """
+            plugins {
+                id("groovy")
+                id("java-gradle-plugin")
+            }
+
+            gradlePlugin {
+                plugins {
+                    myPlugin {
+                        id = "my-plugin"
+                        implementationClass = "my.MyPlugin"
+                    }
+                }
+            }
+
+            dependencies {
+                compileOnly("junit:junit:4.13")
+            }
+
+            ${mavenCentralRepository()}
+        """.stripIndent()
 
         and:
         buildFile << requestPlugin("my-plugin", "1.0")
@@ -356,7 +478,50 @@ class AlreadyOnClasspathPluginUseIntegrationTest extends AbstractIntegrationSpec
 
         then:
         failureDescriptionStartsWith("Error resolving plugin [id: 'my-plugin', version: '1.0']")
-        failureHasCause("The request for this plugin could not be satisfied because the plugin is already on the classpath with an unknown version, so compatibility cannot be checked.")
+        failureHasCause("Plugin 'my-plugin' version '1.0' was requested, but the plugin is already on the classpath of buildSrc, and Gradle cannot tell which version that is.")
+    }
+
+    def "cannot request plugin version of plugin from #classpathScript buildscript classpath"() {
+        given:
+        withBinaryPluginPublishedLocally()
+
+        and:
+        def buildscriptBlock = """
+            buildscript {
+                repositories {
+                    maven {
+                        url = uri("${file(localPluginRepoPath).toURI()}")
+                    }
+                }
+                dependencies {
+                    classpath("com.acme:my-local-plugins:1.0")
+                }
+            }
+        """
+        createDirs("a", "a/b")
+        if (classpathScript == "settings.gradle") {
+            withSettings(buildscriptBlock + "include('a', 'a:b')")
+        } else {
+            withSettings("include('a', 'a:b')")
+            file(classpathScript) << buildscriptBlock
+        }
+
+        and:
+        file(requestingScript) << requestPlugin("my-plugin", "1.0")
+
+        when:
+        fails "help"
+
+        then:
+        failureDescriptionStartsWith("Error resolving plugin [id: 'my-plugin', version: '1.0']")
+        failureHasCause("Plugin 'my-plugin' version '1.0' was requested, but the plugin is already on the classpath of $source, and Gradle cannot tell which version that is.")
+        failure.assertHasResolution(REMOVE_VERSION_RESOLUTION)
+
+        where:
+        classpathScript   | requestingScript   | source
+        "settings.gradle" | "build.gradle"     | "the settings script"
+        "build.gradle"    | "a/build.gradle"   | "the root project"
+        "a/build.gradle"  | "a/b/build.gradle" | "project ':a'"
     }
 
     @Requires(TestExecutionPreconditions.NotEmbeddedExecutor) // TestKit usage inside of the test requires distribution
@@ -369,7 +534,7 @@ class AlreadyOnClasspathPluginUseIntegrationTest extends AbstractIntegrationSpec
             false,
             """
                 Assert.assertTrue(result.output.contains("Error resolving plugin [id: 'my-plugin', version: '1.0']"))
-                Assert.assertTrue(result.output.contains("The request for this plugin could not be satisfied because the plugin is already on the classpath with an unknown version, so compatibility cannot be checked."))
+                Assert.assertTrue(result.output.contains("Plugin 'my-plugin' version '1.0' was requested, but the plugin is already on the classpath of TestKit (GradleRunner.withPluginClasspath()), and Gradle cannot tell which version that is."))
             """.stripIndent()))
 
         expect:
